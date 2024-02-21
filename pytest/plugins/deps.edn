@@ -1,0 +1,3 @@
+{:deps
+ {clnrpc-clj/clnrpc-clj {:local/root "../.."}}
+ }
