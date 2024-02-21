@@ -1,0 +1,16 @@
+Core Lightning plugin library for Clojure.
+
+* Dependency
+
+Add the following dependency to your ~deps.edn~ file (the repository is
+private):
+
+#+BEGIN_SRC clojure
+{:deps
+ {io.github.tonyaldon/clnplugin-clj
+  {:git/url "git@github.com:tonyaldon/clnplugin-clj.git"
+   :git/sha "..."}}}
+#+END_SRC
+
+* Usage
+* Tests
