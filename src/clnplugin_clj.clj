@@ -113,32 +113,28 @@
                (update :rpcmethods #(if (nil? %) {} %))))))
 
 (defn run [plugin]
-  (let [request (json/read-str (read-line) :key-fn keyword)
+  (default! plugin)
+  (let [req (json/read-str (read-line) :key-fn keyword)
         _ (read-line)
-        manifest {:jsonrpc "2.0"
-                  :id (:id request)
-                  :result
-                  {:dynamic true
-                   :options []
-                   :rpcmethods [{:name "foo"
-                                 :usage "usage"
-                                 :description "description"}]}}]
-    (json/write manifest *out* :escape-slash false)
+        resp (getmanifest-resp plugin req)]
+    (json/write resp *out* :escape-slash false)
     (flush))
 
-  (let [request (json/read-str (read-line) :key-fn keyword)
+  (let [req (json/read-str (read-line) :key-fn keyword)
         _ (read-line)
         init {:jsonrpc "2.0"
-              :id (:id request)
+              :id (:id req)
               :result {}}]
     (json/write init *out* :escape-slash false)
     (flush))
 
   (while true
-    (let [request (json/read-str (read-line) :key-fn keyword)
+    (let [req (json/read-str (read-line) :key-fn keyword)
           _ (read-line)
+          method (keyword (:method req))
+          method-fn (get-in (:rpcmethods @plugin) [method :fn])
           resp {:jsonrpc "2.0"
-                :id (:id request)
-                :result {:bar "baz"}}]
+                :id (:id req)
+                :result (method-fn plugin (:params req))}]
       (json/write resp *out* :escape-slash false)
       (flush))))

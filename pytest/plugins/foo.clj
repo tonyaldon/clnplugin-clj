@@ -1,4 +1,8 @@
 (ns foo
   (:require [clnplugin-clj :as plugin]))
 
-(plugin/run nil)
+(def plugin
+  (atom {:rpcmethods
+         {:foo {:fn (fn [plugin params] {:bar "baz"})}}}))
+
+(plugin/run plugin)
