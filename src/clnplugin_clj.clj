@@ -1,6 +1,7 @@
 (ns clnplugin-clj
   "Core Lightning plugin library for Clojure."
-  (:require [clojure.data.json :as json]))
+  (:require [clojure.data.json :as json])
+  (:require [clojure.core.async :refer [go]]))
 
 (defn gm-option
   "Check option and return it in a format understable by lightningd.
@@ -112,6 +113,23 @@
                (update :options #(if (nil? %) {} %))
                (update :rpcmethods #(if (nil? %) {} %))))))
 
+(defn write
+  "..."
+  [_ resp]
+  (json/write resp *out* :escape-slash false)
+  (flush))
+
+(defn process
+  "..."
+  [a plugin req]
+  (go
+    (let [method (keyword (:method req))
+          method-fn (get-in (:rpcmethods @plugin) [method :fn])
+          resp {:jsonrpc "2.0"
+                :id (:id req)
+                :result (method-fn plugin (:params req))}]
+      (send a write resp))))
+
 (defn run [plugin]
   (default! plugin)
   (let [req (json/read-str (read-line) :key-fn keyword)
@@ -128,13 +146,8 @@
     (json/write init *out* :escape-slash false)
     (flush))
 
-  (while true
-    (let [req (json/read-str (read-line) :key-fn keyword)
-          _ (read-line)
-          method (keyword (:method req))
-          method-fn (get-in (:rpcmethods @plugin) [method :fn])
-          resp {:jsonrpc "2.0"
-                :id (:id req)
-                :result (method-fn plugin (:params req))}]
-      (json/write resp *out* :escape-slash false)
-      (flush))))
+  (let [a (agent nil)]
+    (while true
+      (let [req (json/read-str (read-line) :key-fn keyword)
+            _ (read-line)]
+        (process a plugin req)))))
