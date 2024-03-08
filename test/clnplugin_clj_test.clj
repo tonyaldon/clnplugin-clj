@@ -156,20 +156,20 @@
           {:name "foo-3" :usage "" :description "description-3"}
           {:name "foo-4" :usage "usage-4" :description "description-4"}])))
 
-(deftest getmanifest!-test
+(deftest gm-add-params-to-plugin!-test
   (is (= (let [plugin (atom nil)
                req {:params {:allow-deprecated-apis false}}]
-           (plugin/getmanifest! req plugin)
+           (plugin/gm-add-params-to-plugin! req plugin)
            @plugin)
          {:getmanifest {:params {:allow-deprecated-apis false}}})))
 
-(deftest getmanifest-resp-test
+(deftest gm-resp-test
   ;; defaults
   (is (= (let [plugin (atom {:options {}
                              :rpcmethods {}
                              :dynamic true})
                req {:id 16}]
-           (plugin/getmanifest-resp req plugin))
+           (plugin/gm-resp req plugin))
          {:jsonrpc "2.0"
           :id 16
           :result {:options []
@@ -181,7 +181,7 @@
                              :dynamic false
                              :key-not-retained "not retained"})
                req {:id 16}]
-           (plugin/getmanifest-resp req plugin))
+           (plugin/gm-resp req plugin))
          {:jsonrpc "2.0"
           :id 16
           :result {:options []
@@ -208,7 +208,7 @@
                                            :fn 'fn-foo-4}}
                       :dynamic true})
                req {:id 16}]
-           (plugin/getmanifest-resp req plugin))
+           (plugin/gm-resp req plugin))
          {:jsonrpc "2.0"
           :id 16
           :result {:options [{:name "foo-1"
@@ -239,7 +239,7 @@
                                    :rpcmethods {}
                                    :dynamic true})
                      req {:id 16}]
-                 (plugin/getmanifest-resp plugin req)))))
+                 (plugin/gm-resp plugin req)))))
 
 (deftest default!-test
   (is (= (let [plugin (atom nil)]

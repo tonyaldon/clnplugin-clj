@@ -76,7 +76,7 @@
              :description (get method :description "")})]
     (mapv f (seq rpcmethods))))
 
-(defn getmanifest!
+(defn gm-add-params-to-plugin!
   "Store getmanifest params of REQ in PLUGIN.
 
   REQ is meant to be the \"getmanifest\" request receive from lightningd."
@@ -84,7 +84,7 @@
   (swap! plugin #(update % :getmanifest
                          (constantly (select-keys req [:params])))))
 
-(defn getmanifest-resp
+(defn gm-resp
   "Return the response to the getmanifest REQ.
 
   PLUGIN can contain any key; only the keys :options, :rpcmethods,
@@ -154,7 +154,7 @@
   (default! plugin)
 
   (-> (read *in*)
-      (getmanifest-resp plugin)
+      (gm-resp plugin)
       (json/write *out* :escape-slash false))
   (. *out* (flush))
 
