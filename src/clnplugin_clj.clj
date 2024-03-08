@@ -80,7 +80,7 @@
   "Store getmanifest params of REQ in PLUGIN.
 
   REQ is meant to be the \"getmanifest\" request receive from lightningd."
-  [plugin req]
+  [req plugin]
   (swap! plugin #(update % :getmanifest
                          (constantly (select-keys req [:params])))))
 

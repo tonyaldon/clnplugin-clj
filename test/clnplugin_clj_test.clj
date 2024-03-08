@@ -159,7 +159,7 @@
 (deftest getmanifest!-test
   (is (= (let [plugin (atom nil)
                req {:params {:allow-deprecated-apis false}}]
-           (plugin/getmanifest! plugin req)
+           (plugin/getmanifest! req plugin)
            @plugin)
          {:getmanifest {:params {:allow-deprecated-apis false}}})))
 
