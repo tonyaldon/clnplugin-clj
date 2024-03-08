@@ -152,22 +152,21 @@
 
 (defn run [plugin]
   (default! plugin)
-  (let [req (json/read-str (read-line) :key-fn keyword)
-        _ (read-line)
-        resp (getmanifest-resp plugin req)]
-    (json/write resp *out* :escape-slash false)
-    (flush))
 
-  (let [req (json/read-str (read-line) :key-fn keyword)
-        _ (read-line)
+  (-> (read *in*)
+      (#(getmanifest-resp plugin %))
+      (json/write *out* :escape-slash false))
+  (. *out* (flush))
+
+  (let [req (read *in*)
         init {:jsonrpc "2.0"
               :id (:id req)
               :result {}}]
     (json/write init *out* :escape-slash false)
-    (flush))
+    (. *out* (flush)))
 
   (let [a (agent nil)]
-    (while true
-      (let [req (json/read-str (read-line) :key-fn keyword)
-            _ (read-line)]
-        (process a plugin req)))))
+    (loop [req (read *in*)]
+      (when req
+        (process a plugin req)
+        (recur (read *in*))))))
