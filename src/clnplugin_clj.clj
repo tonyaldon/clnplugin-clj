@@ -114,6 +114,13 @@
                (update :options #(if (nil? %) {} %))
                (update :rpcmethods #(if (nil? %) {} %))))))
 
+(defn process-getmanifest!
+  "..."
+  [req plugin out]
+  (json/write (gm-resp req plugin) out :escape-slash false)
+  (. *out* (flush))
+  (gm-add-params-to-plugin! req plugin))
+
 (defn write
   "..."
   [_ resp]
