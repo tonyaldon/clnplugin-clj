@@ -169,7 +169,7 @@
                              :rpcmethods {}
                              :dynamic true})
                req {:id 16}]
-           (plugin/getmanifest-resp plugin req))
+           (plugin/getmanifest-resp req plugin))
          {:jsonrpc "2.0"
           :id 16
           :result {:options []
@@ -181,7 +181,7 @@
                              :dynamic false
                              :key-not-retained "not retained"})
                req {:id 16}]
-           (plugin/getmanifest-resp plugin req))
+           (plugin/getmanifest-resp req plugin))
          {:jsonrpc "2.0"
           :id 16
           :result {:options []
@@ -208,7 +208,7 @@
                                            :fn 'fn-foo-4}}
                       :dynamic true})
                req {:id 16}]
-           (plugin/getmanifest-resp plugin req))
+           (plugin/getmanifest-resp req plugin))
          {:jsonrpc "2.0"
           :id 16
           :result {:options [{:name "foo-1"

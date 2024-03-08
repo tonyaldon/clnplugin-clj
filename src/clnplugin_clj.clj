@@ -96,7 +96,7 @@
 
   See clnplugin-clj/gm-rpcmethods, clnplugin-clj/gm-options,
   and clnplugin-clj/default! ."
-  [plugin req]
+  [req plugin]
   (let [p @plugin]
     {:jsonrpc "2.0"
      :id (:id req)
@@ -154,7 +154,7 @@
   (default! plugin)
 
   (-> (read *in*)
-      (#(getmanifest-resp plugin %))
+      (getmanifest-resp plugin)
       (json/write *out* :escape-slash false))
   (. *out* (flush))
 
