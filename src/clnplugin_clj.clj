@@ -159,11 +159,7 @@
 
 (defn run [plugin]
   (default! plugin)
-
-  (-> (read *in*)
-      (gm-resp plugin)
-      (json/write *out* :escape-slash false))
-  (. *out* (flush))
+  (process-getmanifest! (read *in*) plugin *out*)
 
   (let [req (read *in*)
         init {:jsonrpc "2.0"
