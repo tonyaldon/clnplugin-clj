@@ -1,7 +1,8 @@
 (ns clnplugin-clj-test
   "Test clnplugin-clj library."
   (:require [clojure.test :refer :all])
-  (:require [clnplugin-clj :as plugin]))
+  (:require [clnplugin-clj :as plugin])
+  (:require [clojure.data.json :as json]))
 
 (deftest gm-option-test
   ;; defaults when option map argument is `nil`
@@ -280,3 +281,36 @@
          {:options {:opt1 'opt1}
           :rpcmethods {:foo 'foo}
           :dynamic false})))
+
+(deftest read-test
+  (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}
+               req-str (str (json/write-str req :escape-slash false) "\n\n")]
+           (with-open [in (-> (java.io.StringReader. req-str) clojure.lang.LineNumberingPushbackReader.)]
+             (plugin/read in)))
+         {:jsonrpc "2.0" :id 0 :method "foo" :params {}}))
+  (is (= (let [req-str (str "{\"jsonrpc\":\"2.0\","
+                            "\n"
+                            "\"id\":0,\"method\":\"foo\",\"params\":{}}"
+                            "\n\n")]
+           (with-open [in (-> (java.io.StringReader. req-str) clojure.lang.LineNumberingPushbackReader.)]
+             (plugin/read in)))
+         {:jsonrpc "2.0" :id 0 :method "foo" :params {}}))
+  (is (= (let [req-0 {:jsonrpc "2.0" :id 0 :method "foo-0" :params {}}
+               req-1 {:jsonrpc "2.0" :id 0 :method "foo-1" :params {}}
+               req-0-str (str (json/write-str req-0 :escape-slash false) "\n\n")
+               req-1-str (str (json/write-str req-1 :escape-slash false) "\n\n")
+               reqs-str (str req-0-str req-1-str)]
+           (with-open [in (-> (java.io.StringReader. reqs-str) clojure.lang.LineNumberingPushbackReader.)]
+             (plugin/read in)))
+         {:jsonrpc "2.0" :id 0 :method "foo-0" :params {}}))
+  (is (=
+       (let [req-str "foo\n"]
+         (with-open [in (-> (java.io.StringReader. req-str) clojure.lang.LineNumberingPushbackReader.)]
+           (plugin/read in)))
+       nil))
+  (is (thrown-with-msg?
+       Throwable
+       #"Invalid token in json input: 'foo'"
+       (let [req-str "foo\n\n"]
+         (with-open [in (-> (java.io.StringReader. req-str) clojure.lang.LineNumberingPushbackReader.)]
+           (plugin/read in))))))

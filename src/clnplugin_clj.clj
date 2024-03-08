@@ -1,5 +1,6 @@
 (ns clnplugin-clj
   "Core Lightning plugin library for Clojure."
+  (:refer-clojure :exclude [read])
   (:require [clojure.data.json :as json])
   (:require [clojure.core.async :refer [go]]))
 
@@ -129,6 +130,25 @@
                 :id (:id req)
                 :result (method-fn plugin (:params req))}]
       (send a write resp))))
+
+(defn read
+  "Read a CLN JSON-RPC request from IN.
+
+  CLN requests end with an empty line \"\\n\\n\"."
+  [in]
+  (binding [*in* in]
+    (loop [req-acc "" line (read-line)]
+      (cond
+        (nil? line) nil
+        (empty? line)
+        (try
+          (json/read-str req-acc :key-fn keyword)
+          (catch Exception e
+            (throw
+             (let [msg (format "Invalid token in json input: '%s'" req-acc)]
+               (ex-info msg {:error {:code -32600 :message msg}})))))
+        true (let [next-line (read-line)]
+               (recur (str req-acc line) next-line))))))
 
 (defn run [plugin]
   (default! plugin)
