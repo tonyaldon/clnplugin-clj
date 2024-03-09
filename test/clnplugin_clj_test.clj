@@ -156,13 +156,6 @@
           {:name "foo-3" :usage "" :description "description-3"}
           {:name "foo-4" :usage "usage-4" :description "description-4"}])))
 
-(deftest gm-add-params-to-plugin!-test
-  (is (= (let [plugin (atom nil)
-               req {:params {:allow-deprecated-apis false}}]
-           (plugin/gm-add-params-to-plugin! req plugin)
-           @plugin)
-         {:getmanifest {:params {:allow-deprecated-apis false}}})))
-
 (deftest gm-resp-test
   ;; defaults
   (is (= (let [plugin (atom {:options {}
@@ -281,6 +274,25 @@
          {:options {:opt1 'opt1}
           :rpcmethods {:foo 'foo}
           :dynamic false})))
+
+(deftest add-req-params-to-plugin!-test
+  (is (= (let [plugin (atom nil)
+               req {:method "getmanifest"
+                    :params {:allow-deprecated-apis false}}]
+           (plugin/add-req-params-to-plugin! req plugin)
+           @plugin)
+         {:getmanifest {:params {:allow-deprecated-apis false}}}))
+  (is (= (let [plugin (atom nil)
+               req {:method "init"
+                    :params
+                    {:options {:bar "BAR"}
+                     :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                     :rpc-file "lightning-rpc"}}}]
+           (plugin/add-req-params-to-plugin! req plugin)
+           @plugin)
+         {:init {:params {:options {:bar "BAR"}
+                          :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                          :rpc-file "lightning-rpc"}}}})))
 
 (deftest process-getmanifest!-test
   (let [plugin (atom {:options {:opt 'opt}

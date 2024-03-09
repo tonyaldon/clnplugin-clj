@@ -76,14 +76,6 @@
              :description (get method :description "")})]
     (mapv f (seq rpcmethods))))
 
-(defn gm-add-params-to-plugin!
-  "Store getmanifest params of REQ in PLUGIN.
-
-  REQ is meant to be the \"getmanifest\" request receive from lightningd."
-  [req plugin]
-  (swap! plugin #(update % :getmanifest
-                         (constantly (select-keys req [:params])))))
-
 (defn gm-resp
   "Return the response to the getmanifest REQ.
 
@@ -114,12 +106,22 @@
                (update :options #(if (nil? %) {} %))
                (update :rpcmethods #(if (nil? %) {} %))))))
 
+(defn add-req-params-to-plugin!
+  "Store params of REQ in PLUGIN with key being keyword of REQ's method.
+
+  Use this to store params received from CLN in \"getmanifest\" and
+  \"init\" request."
+  [req plugin]
+  (let [method (keyword (:method req))
+        params (select-keys req [:params])]
+    (swap! plugin #(merge % {method params}))))
+
 (defn process-getmanifest!
   "..."
   [req plugin out]
   (json/write (gm-resp req plugin) out :escape-slash false)
   (. *out* (flush))
-  (gm-add-params-to-plugin! req plugin))
+  (add-req-params-to-plugin! req plugin))
 
 (defn write
   "..."
