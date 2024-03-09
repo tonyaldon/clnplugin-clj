@@ -113,7 +113,7 @@
   \"init\" request."
   [req plugin]
   (let [method (keyword (:method req))
-        params (select-keys req [:params])]
+        params (:params req)]
     (swap! plugin #(merge % {method params}))))
 
 (defn process-getmanifest!

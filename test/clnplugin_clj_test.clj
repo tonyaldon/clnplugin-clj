@@ -281,7 +281,7 @@
                     :params {:allow-deprecated-apis false}}]
            (plugin/add-req-params-to-plugin! req plugin)
            @plugin)
-         {:getmanifest {:params {:allow-deprecated-apis false}}}))
+         {:getmanifest {:allow-deprecated-apis false}}))
   (is (= (let [plugin (atom nil)
                req {:method "init"
                     :params
@@ -290,9 +290,9 @@
                                      :rpc-file "lightning-rpc"}}}]
            (plugin/add-req-params-to-plugin! req plugin)
            @plugin)
-         {:init {:params {:options {:bar "BAR"}
-                          :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
-                                          :rpc-file "lightning-rpc"}}}})))
+         {:init {:options {:bar "BAR"}
+                 :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                 :rpc-file "lightning-rpc"}}})))
 
 (deftest process-getmanifest!-test
   (let [plugin (atom {:options {:opt 'opt}
@@ -309,7 +309,7 @@
                      :dynamic true}}))
     (is (=
          (:getmanifest @plugin)
-         {:params {:allow-deprecated-apis false}}))))
+         {:allow-deprecated-apis false}))))
 
 (deftest read-test
   (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}
