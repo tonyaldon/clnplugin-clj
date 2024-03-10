@@ -119,9 +119,9 @@
 (defn process-getmanifest!
   "..."
   [req plugin out]
+  (add-req-params-to-plugin! req plugin)
   (json/write (gm-resp req plugin) out :escape-slash false)
-  (. *out* (flush))
-  (add-req-params-to-plugin! req plugin))
+  (. out (flush)))
 
 (defn write
   "..."
