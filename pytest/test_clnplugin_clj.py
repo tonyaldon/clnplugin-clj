@@ -5,8 +5,22 @@ import time
 def test_foo(node_factory):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/foo")
     l1 = node_factory.get_node(options={"plugin": plugin})
-    l1_info = l1.rpc.getinfo()
     assert l1.rpc.call("foo") == {"bar": "baz"}
+
+
+def test_init(node_factory):
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/init")
+    l1 = node_factory.get_node(options={"plugin": plugin,
+                                        "foo": "FOO",
+                                        "bar": "BAR"})
+    assert l1.rpc.call("get-x-set-at-init") == {"x": 1}
+    assert l1.rpc.call("get-plugin-options-values") == {"foo": "FOO", "bar": "BAR"}
+    l1.rpc.plugin_stop(plugin)
+    l1.rpc.plugin_start(plugin, foo="foo-plugin-restarted", bar="bar-plugin-restarted")
+    assert l1.rpc.call("get-x-set-at-init") == {"x": 1}
+    assert l1.rpc.call("get-plugin-options-values") == {"foo": "foo-plugin-restarted",
+                                                        "bar": "bar-plugin-restarted"}
+
 
 def test_async(node_factory, executor):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/async")

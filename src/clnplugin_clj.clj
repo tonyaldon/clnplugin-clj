@@ -206,13 +206,7 @@
 (defn run [plugin]
   (default! plugin)
   (process-getmanifest! (read *in*) plugin *out*)
-
-  (let [req (read *in*)
-        init {:jsonrpc "2.0"
-              :id (:id req)
-              :result {}}]
-    (json/write init *out* :escape-slash false)
-    (. *out* (flush)))
+  (process-init! (read *in*) plugin *out*)
 
   (let [a (agent nil)]
     (loop [req (read *in*)]
