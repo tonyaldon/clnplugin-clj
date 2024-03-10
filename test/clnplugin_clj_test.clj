@@ -415,6 +415,25 @@
                                    :rpc-file "lightning-rpc"}}
             :socket-file "/tmp/l1-regtest/regtest/lightning-rpc"
             :set-by-init-fn "init-fn"})))
+  (let [plugin (atom {:options {} :rpcmethods {} :dynamic true
+                      :getmanifest {:allow-deprecated-apis false}})
+        req {:jsonrpc "2.0" :id 0 :method "init"
+             :params {:options {}
+                      :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                      :rpc-file "lightning-rpc"}}}
+        out (new java.io.StringWriter)]
+    (plugin/process-init! req plugin out)
+    (is (= (json/read-str (str out) :key-fn keyword)
+           {:jsonrpc "2.0" :id 0 :result {}}))
+    (is (= @plugin
+           {:options {}
+            :rpcmethods {}
+            :dynamic true
+            :getmanifest {:allow-deprecated-apis false}
+            :init {:options {}
+                   :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                   :rpc-file "lightning-rpc"}}
+            :socket-file "/tmp/l1-regtest/regtest/lightning-rpc"})))
   (is (thrown-with-msg?
        Throwable
        #"Cannot initialize plugin.  :init-fn must be a function not 'not-a-function' which is an instance of 'class clojure.lang.Symbol'"
