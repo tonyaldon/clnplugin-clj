@@ -139,6 +139,13 @@
       (let [msg (format "Cannot set '%s' option which has not been declared to lightningd" kw-opt)]
         (ex-info msg {:error {:code -32600 :message msg}}))))))
 
+(defn set-options-at-init!
+  "..."
+  [options plugin]
+  (when-not (empty? options)
+    (doseq [opt (seq options)]
+      (set-option! opt plugin :at-init))))
+
 (defn write
   "..."
   [_ resp]

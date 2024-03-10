@@ -352,6 +352,36 @@
                     :bar {:default "bar-default"
                           :dynamic true
                           :value "bar-value"}}})))
+
+(deftest set-options-at-init!-test
+  (is (= (let [plugin (atom {:options {:foo nil
+                                       :bar {:default "bar-default"}
+                                       :baz {:dynamic true}}})]
+           (plugin/set-options-at-init! {} plugin)
+           @plugin)
+         {:options {:foo nil
+                    :bar {:default "bar-default"}
+                    :baz {:dynamic true}}}))
+  (is (= (let [plugin (atom {:options {:foo nil
+                                       :bar {:default "bar-default"}
+                                       :baz {:dynamic true}}})]
+           (plugin/set-options-at-init! {:foo "foo-value"} plugin)
+           @plugin)
+         {:options {:foo {:value "foo-value"}
+                    :bar {:default "bar-default"}
+                    :baz {:dynamic true}}}))
+  (is (= (let [plugin (atom {:options {:foo nil
+                                       :bar {:default "bar-default"}
+                                       :baz {:dynamic true}}})]
+           (plugin/set-options-at-init! {:foo "foo-value"
+                                         :bar "bar-value"
+                                         :baz "baz-value"} plugin)
+           @plugin)
+         {:options {:foo {:value "foo-value"}
+                    :bar {:default "bar-default"
+                          :value "bar-value"}
+                    :baz {:dynamic true
+                          :value "baz-value"}}})))
 (deftest read-test
   (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}
                req-str (str (json/write-str req :escape-slash false) "\n\n")]
