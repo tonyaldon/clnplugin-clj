@@ -382,6 +382,54 @@
                           :value "bar-value"}
                     :baz {:dynamic true
                           :value "baz-value"}}})))
+
+(deftest process-init!-test
+  (let [plugin (atom {:options {:foo nil
+                                :bar {:default "bar-default"}
+                                :baz {:dynamic true}}
+                      :rpcmethods {}
+                      :dynamic true
+                      :getmanifest {:allow-deprecated-apis false}
+                      :init-fn (fn [req plugin]
+                                 (swap! plugin assoc-in [:set-by-init-fn] "init-fn"))})
+        req {:jsonrpc "2.0" :id 0 :method "init"
+             :params {:options {:foo "foo-value"
+                                :bar "bar-value"}
+                      :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                      :rpc-file "lightning-rpc"}}}
+        out (new java.io.StringWriter)]
+    (plugin/process-init! req plugin out)
+    (is (= (json/read-str (str out) :key-fn keyword)
+           {:jsonrpc "2.0" :id 0 :result {}}))
+    (is (= (dissoc @plugin :init-fn)
+           {:options {:foo {:value "foo-value"}
+                      :bar {:default "bar-default"
+                            :value "bar-value"}
+                      :baz {:dynamic true}}
+            :rpcmethods {}
+            :dynamic true
+            :getmanifest {:allow-deprecated-apis false}
+            :init {:options {:foo "foo-value"
+                             :bar "bar-value"}
+                   :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                   :rpc-file "lightning-rpc"}}
+            :socket-file "/tmp/l1-regtest/regtest/lightning-rpc"
+            :set-by-init-fn "init-fn"})))
+  (is (thrown-with-msg?
+       Throwable
+       #"Cannot initialize plugin.  :init-fn must be a function not 'not-a-function' which is an instance of 'class clojure.lang.Symbol'"
+       (let [plugin (atom {:options {}
+                           :rpcmethods {}
+                           :dynamic true
+                           :getmanifest {:allow-deprecated-apis false}
+                           :init-fn 'not-a-function})
+             req {:jsonrpc "2.0" :id 0 :method "init"
+                  :params {:options {}
+                           :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                           :rpc-file "lightning-rpc"}}}
+             out (new java.io.StringWriter)]
+         (plugin/process-init! req plugin out)))))
+
 (deftest read-test
   (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}
                req-str (str (json/write-str req :escape-slash false) "\n\n")]

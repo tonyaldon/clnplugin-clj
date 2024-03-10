@@ -146,6 +146,27 @@
     (doseq [opt (seq options)]
       (set-option! opt plugin :at-init))))
 
+(defn process-init!
+  "..."
+  [req plugin out]
+  (let [dir (get-in req [:params :configuration :lightning-dir])
+        rpc-file (get-in req [:params :configuration :rpc-file])
+        socket-file (str (clojure.java.io/file dir rpc-file))
+        options (get-in req [:params :options])
+        resp {:jsonrpc "2.0" :id (:id req) :result {}}]
+    (swap! plugin assoc-in [:socket-file] socket-file)
+    (set-options-at-init! options plugin)
+    (add-req-params-to-plugin! req plugin)
+    (when-let [init-fn (:init-fn @plugin)]
+      (if (fn? init-fn)
+        (init-fn req plugin)
+        (throw
+         (let [msg (format "Cannot initialize plugin.  :init-fn must be a function not '%s' which is an instance of '%s'"
+                           init-fn (class init-fn))]
+           (ex-info msg {:error {:code -32600 :message msg}})))))
+    (json/write resp out :escape-slash false)
+    (. out (flush))))
+
 (defn write
   "..."
   [_ resp]
