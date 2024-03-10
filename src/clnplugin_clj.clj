@@ -123,6 +123,22 @@
   (json/write (gm-resp req plugin) out :escape-slash false)
   (. out (flush)))
 
+(defn set-option!
+  "..."
+  ([[kw-opt value] plugin]
+   (set-option! [kw-opt value] plugin false))
+  ([[kw-opt value] plugin at-init]
+   (if (contains? (:options @plugin) kw-opt)
+     (if (or at-init
+             (get-in @plugin [:options kw-opt :dynamic]))
+       (swap! plugin assoc-in [:options kw-opt :value] value)
+       (throw
+        (let [msg (format "Cannot set '%s' option which is not dynamic.  Add ':dynamic true' to its declaration." kw-opt)]
+          (ex-info msg {:error {:code -32600 :message msg}}))))
+     (throw
+      (let [msg (format "Cannot set '%s' option which has not been declared to lightningd" kw-opt)]
+        (ex-info msg {:error {:code -32600 :message msg}}))))))
+
 (defn write
   "..."
   [_ resp]

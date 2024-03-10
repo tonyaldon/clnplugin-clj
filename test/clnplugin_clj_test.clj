@@ -311,6 +311,47 @@
          (:getmanifest @plugin)
          {:allow-deprecated-apis false}))))
 
+(deftest set-option!-test
+  (is (thrown-with-msg?
+       Throwable
+       #"Cannot set ':foo' option which has not been declared to lightningd"
+       (let [plugin (atom {:options {}})]
+         (plugin/set-option! [:foo "foo-value"] plugin :at-init))))
+  (is (thrown-with-msg?
+       Throwable
+       #"Cannot set ':foo' option which has not been declared to lightningd"
+       (let [plugin (atom {:options {}})]
+         (plugin/set-option! [:foo "foo-value"] plugin))))
+  (is (= (let [plugin (atom {:options {:foo nil}})]
+           (plugin/set-option! [:foo "foo-value"] plugin :at-init)
+           @plugin)
+         {:options {:foo {:value "foo-value"}}}))
+  (is (= (let [plugin (atom {:options {:foo {:dynamic true}}})]
+           (plugin/set-option! [:foo "foo-value"] plugin)
+           @plugin)
+         {:options {:foo {:dynamic true
+                          :value "foo-value"}}}))
+  (is (thrown-with-msg?
+       Throwable
+       #"Cannot set ':foo' option which is not dynamic.  Add ':dynamic true' to its declaration."
+       (let [plugin (atom {:options {:foo nil}})]
+         (plugin/set-option! [:foo "foo-value"] plugin))))
+  (is (= (let [plugin (atom {:options {:foo nil
+                                       :bar {:default "bar-default"}}})]
+           (plugin/set-option! [:bar "bar-value"] plugin :at-init)
+           @plugin)
+         {:options {:foo nil
+                    :bar {:default "bar-default"
+                          :value "bar-value"}}}))
+  (is (= (let [plugin (atom {:options {:foo nil
+                                       :bar {:default "bar-default"
+                                             :dynamic true}}})]
+           (plugin/set-option! [:bar "bar-value"] plugin)
+           @plugin)
+         {:options {:foo nil
+                    :bar {:default "bar-default"
+                          :dynamic true
+                          :value "bar-value"}}})))
 (deftest read-test
   (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}
                req-str (str (json/write-str req :escape-slash false) "\n\n")]
