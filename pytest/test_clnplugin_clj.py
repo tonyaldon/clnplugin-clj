@@ -22,6 +22,27 @@ def test_init(node_factory):
                                                         "bar": "bar-plugin-restarted"}
 
 
+def test_dynamic_options(node_factory):
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/dynamic_options")
+    l1 = node_factory.get_node(options={"plugin": plugin})
+    setconfig_resp = l1.rpc.setconfig(config="foo-dynamic", val="foo-value-0")
+    assert setconfig_resp["config"]["value_str"] == "foo-value-0"
+    listconfigs_resp = l1.rpc.listconfigs()
+    assert listconfigs_resp["configs"]["foo-dynamic"]["value_str"] == "foo-value-0"
+    assert l1.rpc.call("get-foo-dynamic-value") == {"foo-dynamic": "foo-value-0"}
+
+    l1.stop()
+    l1.start()
+    assert listconfigs_resp["configs"]["foo-dynamic"]["value_str"] == "foo-value-0"
+    assert l1.rpc.call("get-foo-dynamic-value") == {"foo-dynamic": "foo-value-0"}
+
+    setconfig_resp = l1.rpc.setconfig(config="foo-dynamic", val="foo-value-1")
+    assert setconfig_resp["config"]["value_str"] == "foo-value-1"
+    listconfigs_resp = l1.rpc.listconfigs()
+    assert listconfigs_resp["configs"]["foo-dynamic"]["value_str"] == "foo-value-1"
+    assert l1.rpc.call("get-foo-dynamic-value") == {"foo-dynamic": "foo-value-1"}
+
+
 def test_async(node_factory, executor):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/async")
     l1 = node_factory.get_node(options={"plugin": plugin})

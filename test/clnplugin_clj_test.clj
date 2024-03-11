@@ -93,7 +93,15 @@
        #"'foo' option cannot be 'multi'.  Only options of type 'string' and 'int' can."
        (plugin/gm-option [:foo {:type "bool"
                                 :description "foo-description"
-                                :multi true}]))))
+                                :multi true}])))
+  ;; dynamic
+  (is (= (plugin/gm-option [:foo {:type "string"
+                                  :description "foo-description"
+                                  :dynamic true}])
+         {:name "foo"
+          :type "string"
+          :description "foo-description"
+          :dynamic true})))
 
 (deftest gm-options-test
   (is (= (plugin/gm-options {}) []))
@@ -448,6 +456,30 @@
                                            :rpc-file "lightning-rpc"}}}
              out (new java.io.StringWriter)]
          (plugin/process-init! req plugin out)))))
+
+(deftest setconfig!-test
+  (let [plugin (atom {:options {:foo {:dynamic true}}})
+        params {:config "foo", :val "foo-value"}
+        resp (plugin/setconfig! plugin params)]
+    (is (= resp {}))
+    (is (= @plugin {:options {:foo {:value "foo-value"
+                                    :dynamic true}}})))
+  ;; 'foo' option is not dynamic
+  (is (thrown?
+       Throwable
+       (let [plugin (atom {:options {:foo nil}})
+             params {:config "foo", :val "foo-value"}]
+         (plugin/setconfig! plugin params)))))
+
+(deftest add-rpcmethod-to-plugin!-test
+  (let [plugin (atom {:rpcmethods {}})
+        foo-fn (fn [plugin params] {:bar "baz"})]
+    (plugin/add-rpcmethod-to-plugin! :foo foo-fn plugin)
+    (is (= (get-in @plugin [:rpcmethods :foo :fn])
+           foo-fn))
+    (plugin/add-rpcmethod-to-plugin! :setconfig plugin/setconfig! plugin)
+    (is (= (get-in @plugin [:rpcmethods :setconfig :fn])
+           plugin/setconfig!))))
 
 (deftest read-test
   (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}

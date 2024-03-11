@@ -13,14 +13,17 @@
     - \"int\": parsed as a signed integer (64-bit)
     - \"bool\": a boolean
     - \"flag\": no-arg flag option.  Presented as true if config specifies it.
-  - If TYPE is string or int, MULTI can set to true which indicates
+  - If TYPE is string or int, MULTI can be set to true which indicates
     that the option can be specified multiple times.  These will always be represented
     in the init request as a (possibly empty) JSON array.
 
-  If TYPE is not specied, set it to \"string\".
+  If TYPE is not specified, set it to \"string\".
 
-  If DESCRIPTION is not specied, set it to \"\"."
-  [[kw-name {:keys [type description default multi] :as option}]]
+  If DESCRIPTION is not specified, set it to \"\".
+
+  If DYNAMIC is true, KW-NAME can be set dynamically with `setconfig`
+  CLN command."
+  [[kw-name {:keys [type description default multi dynamic] :as option}]]
   (let [-name {:name (name kw-name)}
         -type (cond (nil? type)
                     {:type "string"}
@@ -52,8 +55,9 @@
                     (ex-info
                      (format "'%s' option cannot be 'multi'.  Only options of type 'string' and 'int' can."
                              (name kw-name))
-                     {:kw-name kw-name :option option}))))]
-    (merge -name -type -description -default -multi)))
+                     {:kw-name kw-name :option option}))))
+        -dynamic (and dynamic {:dynamic true})]
+    (merge -name -type -description -default -multi -dynamic)))
 
 (defn gm-options
   "Return the vector of plugin options meant to be used in the getmanifest response.
@@ -167,6 +171,19 @@
     (json/write resp out :escape-slash false)
     (. out (flush))))
 
+(defn setconfig!
+  "..."
+  [plugin params]
+  (let [kw-opt (keyword (:config params))
+        value (:val params)]
+    (set-option! [kw-opt value] plugin)
+    {}))
+
+(defn add-rpcmethod-to-plugin!
+  "..."
+  [method fn plugin]
+  (swap! plugin assoc-in [:rpcmethods method] {:fn fn}))
+
 (defn write
   "..."
   [_ resp]
@@ -207,6 +224,7 @@
   (default! plugin)
   (process-getmanifest! (read *in*) plugin *out*)
   (process-init! (read *in*) plugin *out*)
+  (add-rpcmethod-to-plugin! :setconfig setconfig! plugin)
 
   (let [a (agent nil)]
     (loop [req (read *in*)]
