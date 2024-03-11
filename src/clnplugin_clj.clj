@@ -22,8 +22,11 @@
   If DESCRIPTION is not specified, set it to \"\".
 
   If DYNAMIC is true, KW-NAME can be set dynamically with `setconfig`
-  CLN command."
-  [[kw-name {:keys [type description default multi dynamic] :as option}]]
+  CLN command.
+
+  If DEPRECATED is true and the user sets `allow-deprecated-apis` to false,
+  KW-NAME option is disabled by lightningd and must not be used by the plugin."
+  [[kw-name {:keys [type description default multi dynamic deprecated] :as option}]]
   (let [-name {:name (name kw-name)}
         -type (cond (nil? type)
                     {:type "string"}
@@ -56,8 +59,9 @@
                      (format "'%s' option cannot be 'multi'.  Only options of type 'string' and 'int' can."
                              (name kw-name))
                      {:kw-name kw-name :option option}))))
-        -dynamic (and dynamic {:dynamic true})]
-    (merge -name -type -description -default -multi -dynamic)))
+        -dynamic (and dynamic {:dynamic true})
+        -deprecated (and deprecated {:deprecated true})]
+    (merge -name -type -description -default -multi -dynamic -deprecated)))
 
 (defn gm-options
   "Return the vector of plugin options meant to be used in the getmanifest response.

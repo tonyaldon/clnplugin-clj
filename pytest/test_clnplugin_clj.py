@@ -1,4 +1,5 @@
 from pyln.testing.fixtures import *
+from pyln.client import RpcError
 import os
 import time
 
@@ -41,6 +42,20 @@ def test_dynamic_options(node_factory):
     listconfigs_resp = l1.rpc.listconfigs()
     assert listconfigs_resp["configs"]["foo-dynamic"]["value_str"] == "foo-value-1"
     assert l1.rpc.call("get-foo-dynamic-value") == {"foo-dynamic": "foo-value-1"}
+
+
+def test_deprecated_options(node_factory):
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/deprecated_options")
+
+    l1 = node_factory.get_node(options={'allow-deprecated-apis': False})
+    with pytest.raises(RpcError, match=r"deprecated option"):
+        l1.rpc.plugin_start(plugin=plugin, foo_deprecated="foo-value")
+
+    l2 = node_factory.get_node(options={'allow-deprecated-apis': True})
+    l2.rpc.plugin_start(plugin=plugin, foo_deprecated="foo-value")
+    listconfigs_resp = l2.rpc.listconfigs()
+    assert listconfigs_resp["configs"]["foo_deprecated"]["value_str"] == "foo-value"
+    assert l2.rpc.call("get-foo_deprecated-value") == {"foo_deprecated": "foo-value"}
 
 
 def test_async(node_factory, executor):

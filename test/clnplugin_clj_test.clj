@@ -101,7 +101,15 @@
          {:name "foo"
           :type "string"
           :description "foo-description"
-          :dynamic true})))
+          :dynamic true}))
+  ;; deprecated
+  (is (= (plugin/gm-option [:foo {:type "string"
+                                  :description "foo-description"
+                                  :deprecated true}])
+         {:name "foo"
+          :type "string"
+          :description "foo-description"
+          :deprecated true})))
 
 (deftest gm-options-test
   (is (= (plugin/gm-options {}) []))
