@@ -3,6 +3,6 @@
 
 (def plugin
   (atom {:rpcmethods
-         {:foo {:fn (fn [plugin params] {:bar "baz"})}}}))
+         {:foo {:fn (fn [params plugin] {:bar "baz"})}}}))
 
 (plugin/run plugin)

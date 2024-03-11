@@ -177,7 +177,7 @@
 
 (defn setconfig!
   "..."
-  [plugin params]
+  [params plugin]
   (let [kw-opt (keyword (:config params))
         value (:val params)]
     (set-option! [kw-opt value] plugin)
@@ -202,7 +202,7 @@
           method-fn (get-in (:rpcmethods @plugin) [method :fn])
           resp {:jsonrpc "2.0"
                 :id (:id req)
-                :result (method-fn plugin (:params req))}]
+                :result (method-fn (:params req) plugin)}]
       (send a write resp))))
 
 (defn read

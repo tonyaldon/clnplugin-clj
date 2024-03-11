@@ -7,7 +7,7 @@
                                  :dynamic true}}
          :rpcmethods
          {:get-foo-dynamic-value
-          {:fn (fn [plugin params]
+          {:fn (fn [params plugin]
                  {:foo-dynamic (get-in @plugin [:options :foo-dynamic :value])})}}}))
 
 (plugin/run plugin)

@@ -468,7 +468,7 @@
 (deftest setconfig!-test
   (let [plugin (atom {:options {:foo {:dynamic true}}})
         params {:config "foo", :val "foo-value"}
-        resp (plugin/setconfig! plugin params)]
+        resp (plugin/setconfig! params plugin)]
     (is (= resp {}))
     (is (= @plugin {:options {:foo {:value "foo-value"
                                     :dynamic true}}})))
@@ -477,11 +477,11 @@
        Throwable
        (let [plugin (atom {:options {:foo nil}})
              params {:config "foo", :val "foo-value"}]
-         (plugin/setconfig! plugin params)))))
+         (plugin/setconfig! params plugin)))))
 
 (deftest add-rpcmethod-to-plugin!-test
   (let [plugin (atom {:rpcmethods {}})
-        foo-fn (fn [plugin params] {:bar "baz"})]
+        foo-fn (fn [params plugin] {:bar "baz"})]
     (plugin/add-rpcmethod-to-plugin! :foo foo-fn plugin)
     (is (= (get-in @plugin [:rpcmethods :foo :fn])
            foo-fn))

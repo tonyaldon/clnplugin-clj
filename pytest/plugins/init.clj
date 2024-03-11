@@ -12,7 +12,7 @@
          :rpcmethods
          {:get-x-set-at-init {:fn (fn [plugin params] {:x @x})}
           :get-plugin-options-values
-          {:fn (fn [plugin params]
+          {:fn (fn [params plugin]
                  {:foo (get-in @plugin [:options :foo :value])
                   :bar (get-in @plugin [:options :bar :value])})}}
          :init-fn (fn [req plugin] (swap! x (constantly 1)))}))
