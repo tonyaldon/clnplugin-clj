@@ -190,20 +190,20 @@
 
 (defn write
   "..."
-  [_ resp]
-  (json/write resp *out* :escape-slash false)
-  (flush))
+  [_ resp out]
+  (json/write resp out :escape-slash false)
+  (. out (flush)))
 
 (defn process
   "..."
-  [a plugin req]
+  [req plugin resps out]
   (go
     (let [method (keyword (:method req))
           method-fn (get-in (:rpcmethods @plugin) [method :fn])
           resp {:jsonrpc "2.0"
                 :id (:id req)
                 :result (method-fn (:params req) plugin)}]
-      (send a write resp))))
+      (send resps write resp out))))
 
 (defn read
   "Read a CLN JSON-RPC request from IN.
@@ -230,8 +230,8 @@
   (process-init! (read *in*) plugin *out*)
   (add-rpcmethod-to-plugin! :setconfig setconfig! plugin)
 
-  (let [a (agent nil)]
+  (let [resps (agent nil)]
     (loop [req (read *in*)]
       (when req
-        (process a plugin req)
+        (process req plugin resps *out*)
         (recur (read *in*))))))

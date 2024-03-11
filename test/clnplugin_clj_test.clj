@@ -4,6 +4,8 @@
   (:require [clnplugin-clj :as plugin])
   (:require [clojure.data.json :as json]))
 
+(use-fixtures :once (fn [f] (f) (shutdown-agents)))
+
 (deftest gm-option-test
   ;; defaults when option map argument is `nil`
   (is (= (plugin/gm-option [:foo nil])
@@ -488,6 +490,22 @@
     (plugin/add-rpcmethod-to-plugin! :setconfig plugin/setconfig! plugin)
     (is (= (get-in @plugin [:rpcmethods :setconfig :fn])
            plugin/setconfig!))))
+
+(deftest process-test
+  (let [plugin (atom {:rpcmethods {:foo {:fn (fn [params plugin] {:bar (:bar params)})}}})
+        req {:jsonrpc "2.0"
+             :id "some-id"
+             :method "foo"
+             :params {:bar "baz"}}
+        resps (agent nil)
+        out (new java.io.StringWriter)]
+    (plugin/process req plugin resps out)
+    (await resps)
+    (Thread/sleep 100) ;; if we don't wait, out would be empty
+    (is (= (json/read-str (str out) :key-fn keyword)
+           {:jsonrpc "2.0"
+            :id "some-id"
+            :result {:bar "baz"}}))))
 
 (deftest read-test
   (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}
