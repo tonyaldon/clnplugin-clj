@@ -1,6 +1,7 @@
 (ns clnplugin-clj
   "Core Lightning plugin library for Clojure."
   (:refer-clojure :exclude [read])
+  (:require [clojure.string :as str])
   (:require [clojure.data.json :as json])
   (:require [clojure.core.async :refer [go]]))
 
@@ -188,11 +189,28 @@
   [method fn plugin]
   (swap! plugin assoc-in [:rpcmethods method] {:fn fn}))
 
+(defn notif
+  "..."
+  [method params]
+  {:jsonrpc "2.0" :method method :params params})
+
 (defn write
   "..."
-  [_ resp out]
-  (json/write resp out :escape-slash false)
-  (. out (flush)))
+  [_ resps out]
+  (doseq [r resps]
+    (json/write r out :escape-slash false)
+    (. out (flush))))
+
+(defn log
+  "..."
+  ([plugin message]
+   (log plugin message "info"))
+  ([plugin message level]
+   (let [notifs
+         (for [msg (str/split-lines message)]
+           (notif "log" {:level level :message msg}))]
+     (send (:_resps @plugin) write notifs (:_out @plugin)))
+   nil))
 
 (defn stacktrace
   "..."
@@ -222,7 +240,7 @@
                           :stacktrace (stacktrace e)}}))
           resp (merge {:jsonrpc "2.0" :id (:id req)}
                       result-or-error)]
-      (send resps write resp out))))
+      (send resps write [resp] out))))
 
 (defn read
   "Read a CLN JSON-RPC request from IN.
@@ -250,6 +268,8 @@
   (add-rpcmethod-to-plugin! :setconfig setconfig! plugin)
 
   (let [resps (agent nil)]
+    (swap! plugin assoc :_resps resps)
+    (swap! plugin assoc :_out *out*)
     (loop [req (read *in*)]
       (when req
         (process req plugin resps *out*)

@@ -82,3 +82,16 @@ def test_errors(node_factory):
         l1.rpc.call("custom-error")
     with pytest.raises(RpcError, match=r"Error while processing 'execution-error'"):
         l1.rpc.call("execution-error")
+
+
+def test_log(node_factory):
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/log")
+    l1 = node_factory.get_node(options={"plugin": plugin})
+    l1.rpc.call("log-info")
+    assert l1.daemon.is_in_log(r"INFO.*logged by 'log-info'")
+    l1.rpc.call("log-debug")
+    assert l1.daemon.is_in_log(r"DEBUG.*logged by 'log-debug'")
+    l1.rpc.call("log-multi-lines")
+    assert l1.daemon.is_in_log(r"line 0 - logged by 'log-multi-lines'")
+    assert l1.daemon.is_in_log(r"line 1 - logged by 'log-multi-lines'")
+    assert l1.daemon.is_in_log(r"line 2 - logged by 'log-multi-lines'")

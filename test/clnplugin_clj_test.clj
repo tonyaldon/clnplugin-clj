@@ -492,6 +492,45 @@
     (is (= (get-in @plugin [:rpcmethods :setconfig :fn])
            plugin/setconfig!))))
 
+
+(deftest notif-test
+  (let [method "foo" params {:bar "baz"}]
+    (is (= (plugin/notif method params)
+           {:jsonrpc "2.0" :method method :params params}))))
+
+(deftest log-test
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        message "foo"]
+    (plugin/log plugin message)
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, out would be empty
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+           {:jsonrpc "2.0"
+            :method "log"
+            :params {:level "info" :message "foo"}})))
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        message "bar"
+        level "debug"]
+    (plugin/log plugin message level)
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, out would be empty
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+           {:jsonrpc "2.0"
+            :method "log"
+            :params {:level "debug" :message "bar"}})))
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        message "foo-1\nfoo-2\nfoo-3\n"]
+    (plugin/log plugin message)
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, out would be empty
+    (is (= (let [srdr (java.io.StringReader. (str (:_out @plugin)))
+                 pbr (java.io.PushbackReader. srdr 64)]
+             (for [_ (range 3)]
+               (json/read pbr :key-fn keyword)))
+           '({:jsonrpc "2.0", :method "log", :params {:level "info", :message "foo-1"}}
+             {:jsonrpc "2.0", :method "log", :params {:level "info", :message "foo-2"}}
+             {:jsonrpc "2.0", :method "log", :params {:level "info", :message "foo-3"}})))))
+
 (deftest process-test
   (let [plugin (atom {:rpcmethods {:foo {:fn (fn [params plugin] {:bar (:bar params)})}}})
         req {:jsonrpc "2.0"
