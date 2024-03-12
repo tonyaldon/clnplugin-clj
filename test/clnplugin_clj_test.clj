@@ -19,25 +19,6 @@
          {:name "foo"
           :type "string"
           :description "foo-description"}))
-  (is (= (plugin/gm-option [:foo {:type "int"
-                                  :description "foo-description"}])
-         {:name "foo"
-          :type "int"
-          :description "foo-description"}))
-  (is (= (plugin/gm-option [:foo {:type "bool"
-                                  :description "foo-description"}])
-         {:name "foo"
-          :type "bool"
-          :description "foo-description"}))
-  (is (= (plugin/gm-option [:foo {:type "flag"
-                                  :description "foo-description"}])
-         {:name "foo"
-          :type "flag"
-          :description "foo-description"}))
-  (is (thrown-with-msg?
-       Throwable
-       #"Wrong type 'not-a-type' for option 'foo'.  Authorized types are: string, int, bool, flag."
-       (plugin/gm-option [:foo {:type "not-a-type"}])))
   ;; description
   (is (= (plugin/gm-option [:foo {:type "string"
                                   :description "foo-description"}])
@@ -52,30 +33,6 @@
           :type "string"
           :description "foo-description"
           :default "foo bar baz"}))
-  (is (= (plugin/gm-option [:foo {:type "int"
-                                  :description "foo-description"
-                                  :default 1}])
-         {:name "foo"
-          :type "int"
-          :description "foo-description"
-          :default 1}))
-  (is (thrown-with-msg?
-       Throwable
-       #"Default value of 'foo' option has the wrong type.  'string' type is expected and default value is '1'"
-       (plugin/gm-option [:foo {:type "string"
-                                :description "foo-description"
-                                :default 1}])))
-  (is (thrown-with-msg?
-       Throwable
-       #"Default value of 'foo' option has the wrong type.  'string' type is expected and default value is '1'"
-       (plugin/gm-option [:foo {:description "foo-description"
-                                :default 1}])))
-  (is (thrown-with-msg?
-       Throwable
-       #"Default value of 'foo' option has the wrong type.  'int' type is expected and default value is 'true'"
-       (plugin/gm-option [:foo {:type "int"
-                                :description "foo-description"
-                                :default true}])))
   ;; multi
   (is (= (plugin/gm-option [:foo {:type "string"
                                   :description "foo-description"
@@ -91,12 +48,6 @@
           :type "int"
           :description "foo-description"
           :multi true}))
-  (is (thrown-with-msg?
-       Throwable
-       #"'foo' option cannot be 'multi'.  Only options of type 'string' and 'int' can."
-       (plugin/gm-option [:foo {:type "bool"
-                                :description "foo-description"
-                                :multi true}])))
   ;; dynamic
   (is (= (plugin/gm-option [:foo {:type "string"
                                   :description "foo-description"
@@ -147,12 +98,7 @@
           {:name "foo-4"
            :type "string"
            :description "foo-4-description"
-           :multi true}]))
-  (is (thrown? Throwable
-               (= (plugin/gm-options {:foo-1 nil
-                                      :foo-2 {:type "string"
-                                              :description "foo-2-description"
-                                              :default 1}})))))
+           :multi true}])))
 
 (deftest gm-rpcmethods-test
   (is (= (plugin/gm-rpcmethods {}) []))

@@ -28,41 +28,17 @@
   If DEPRECATED is true and the user sets `allow-deprecated-apis` to false,
   KW-NAME option is disabled by lightningd and must not be used by the plugin."
   [[kw-name {:keys [type description default multi dynamic deprecated] :as option}]]
-  (let [-name {:name (name kw-name)}
-        -type (cond (nil? type)
-                    {:type "string"}
-                    (some #{type} #{"string" "int" "bool" "flag"})
-                    {:type type}
-                    true
-                    (throw
-                     (ex-info
-                      (format "Wrong type '%s' for option '%s'.  Authorized types are: string, int, bool, flag."
-                              type (name kw-name))
-                      {:kw-name kw-name :option option})))
-        -description {:description (or description "")}
-        types {java.lang.String "string"
-               java.lang.Long "int"
-               java.lang.Boolean "bool"}
-        -default (when default
-                   (let [default-type (get types (class default))]
-                     (if (= default-type (:type -type))
-                       {:default default}
-                       (throw
-                        (ex-info
-                         (format "Default value of '%s' option has the wrong type.  '%s' type is expected and default value is '%s'"
-                                 (name kw-name) (:type -type) default)
-                         {:kw-name kw-name :option option})))))
-        -multi (when multi
-                 (if (some #{type} #{"string" "int"})
-                   {:multi true}
-                   (throw
-                    (ex-info
-                     (format "'%s' option cannot be 'multi'.  Only options of type 'string' and 'int' can."
-                             (name kw-name))
-                     {:kw-name kw-name :option option}))))
-        -dynamic (and dynamic {:dynamic true})
-        -deprecated (and deprecated {:deprecated true})]
-    (merge -name -type -description -default -multi -dynamic -deprecated)))
+  ;; Don't check options.  Raising an exception here is useless
+  ;; because lightningd won't let us log it or will ignore any json
+  ;; response (with an `error` field) to the getmanifest request.
+  (let [name {:name (name kw-name)}
+        type (if (nil? type) {:type "string"} {:type type})
+        description {:description (or description "")}
+        default (when default {:default default})
+        multi (when multi {:multi true})
+        dynamic (and dynamic {:dynamic true})
+        deprecated (and deprecated {:deprecated true})]
+    (merge name type description default multi dynamic deprecated)))
 
 (defn gm-options
   "Return the vector of plugin options meant to be used in the getmanifest response.
