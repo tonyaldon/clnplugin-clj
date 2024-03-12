@@ -224,7 +224,7 @@
 
 (defn process
   "..."
-  [req plugin resps out]
+  [req plugin]
   (go
     (let [method (keyword (:method req))
           method-fn (get-in (:rpcmethods @plugin) [method :fn])
@@ -241,7 +241,9 @@
                                            (:method req))
                           :stacktrace (stacktrace e)}}))
           resp (merge {:jsonrpc "2.0" :id (:id req)}
-                      result-or-error)]
+                      result-or-error)
+          out (:_out @plugin)
+          resps (:_resps @plugin)]
       (send resps write [resp] out))))
 
 (defn read
@@ -269,10 +271,8 @@
   (process-getmanifest! (read *in*) plugin)
   (process-init! (read *in*) plugin)
   (add-rpcmethod-to-plugin! :setconfig setconfig! plugin)
-
-  (let [resps (agent nil)]
-    (swap! plugin assoc :_resps resps)
-    (loop [req (read *in*)]
-      (when req
-        (process req plugin resps *out*)
-        (recur (read *in*))))))
+  (swap! plugin assoc :_resps (agent nil))
+  (loop [req (read *in*)]
+    (when req
+      (process req plugin)
+      (recur (read *in*)))))
