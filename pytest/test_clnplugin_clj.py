@@ -73,3 +73,12 @@ def test_async(node_factory, executor):
     assert counter == {1,2,3}
     # ensure the call to the method `async` are processed asynchronously
     assert delta < 1.5
+
+
+def test_errors(node_factory):
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/errors")
+    l1 = node_factory.get_node(options={"plugin": plugin})
+    with pytest.raises(RpcError, match=r"custom-error"):
+        l1.rpc.call("custom-error")
+    with pytest.raises(RpcError, match=r"Error while processing 'execution-error'"):
+        l1.rpc.call("execution-error")

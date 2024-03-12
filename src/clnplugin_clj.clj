@@ -194,15 +194,34 @@
   (json/write resp out :escape-slash false)
   (. out (flush)))
 
+(defn stacktrace
+  "..."
+  [exception]
+  (let [sw (new java.io.StringWriter)
+        pw (new java.io.PrintWriter sw)]
+    (.printStackTrace exception pw)
+    (str sw)))
+
 (defn process
   "..."
   [req plugin resps out]
   (go
     (let [method (keyword (:method req))
           method-fn (get-in (:rpcmethods @plugin) [method :fn])
-          resp {:jsonrpc "2.0"
-                :id (:id req)
-                :result (method-fn (:params req) plugin)}]
+          result-or-error
+          (try {:result (method-fn (:params req) plugin)}
+               (catch clojure.lang.ExceptionInfo e
+                 {:error (merge {:code -32600
+                                 :message (format "Error while processing '%s'"
+                                                  (:method req))}
+                                (:error (ex-data e)))})
+               (catch Exception e
+                 {:error {:code -32600
+                          :message (format "Error while processing '%s'"
+                                           (:method req))
+                          :stacktrace (stacktrace e)}}))
+          resp (merge {:jsonrpc "2.0" :id (:id req)}
+                      result-or-error)]
       (send resps write resp out))))
 
 (defn read

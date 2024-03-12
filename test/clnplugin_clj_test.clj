@@ -2,7 +2,8 @@
   "Test clnplugin-clj library."
   (:require [clojure.test :refer :all])
   (:require [clnplugin-clj :as plugin])
-  (:require [clojure.data.json :as json]))
+  (:require [clojure.data.json :as json])
+  (:require [clojure.string :as str]))
 
 (use-fixtures :once (fn [f] (f) (shutdown-agents)))
 
@@ -505,7 +506,107 @@
     (is (= (json/read-str (str out) :key-fn keyword)
            {:jsonrpc "2.0"
             :id "some-id"
-            :result {:bar "baz"}}))))
+            :result {:bar "baz"}})))
+  (let [plugin (atom {:rpcmethods
+                      {:custom-error
+                       {:fn (fn [params plugin]
+                              (throw
+                               (let [msg "custom-error"]
+                                 (ex-info msg {:error
+                                               {:code -100 :message msg}}))))}}})
+        req {:jsonrpc "2.0"
+             :id "some-id"
+             :method "custom-error"
+             :params {}}
+        resps (agent nil)
+        out (new java.io.StringWriter)]
+    (plugin/process req plugin resps out)
+    (await resps)
+    (Thread/sleep 100) ;; if we don't wait, out would be empty
+    (is (= (json/read-str (str out) :key-fn keyword)
+           {:jsonrpc "2.0"
+            :id "some-id"
+            :error
+            {:code -100 :message "custom-error"}})))
+  ;; missing :code key in the error thrown by :fn
+  ;; so it is set to -326000
+  (let [plugin (atom {:rpcmethods
+                      {:custom-error
+                       {:fn (fn [params plugin]
+                              (throw
+                               (let [msg "custom-error"]
+                                 (ex-info msg {:error {:message msg}}))))}}})
+        req {:jsonrpc "2.0"
+             :id "some-id"
+             :method "custom-error"
+             :params {}}
+        resps (agent nil)
+        out (new java.io.StringWriter)]
+    (plugin/process req plugin resps out)
+    (await resps)
+    (Thread/sleep 100) ;; if we don't wait, out would be empty
+    (is (= (json/read-str (str out) :key-fn keyword)
+           {:jsonrpc "2.0"
+            :id "some-id"
+            :error
+            {:code -32600 :message "custom-error"}})))
+  ;; missing :message key in the error thrown by :fn
+  (let [plugin (atom {:rpcmethods
+                      {:custom-error
+                       {:fn (fn [params plugin]
+                              (throw
+                               (ex-info "custom-error" {:error {:code -100}})))}}})
+        req {:jsonrpc "2.0"
+             :id "some-id"
+             :method "custom-error"
+             :params {}}
+        resps (agent nil)
+        out (new java.io.StringWriter)]
+    (plugin/process req plugin resps out)
+    (await resps)
+    (Thread/sleep 100) ;; if we don't wait, out would be empty
+    (is (= (json/read-str (str out) :key-fn keyword)
+           {:jsonrpc "2.0"
+            :id "some-id"
+            :error
+            {:code -100 :message "Error while processing 'custom-error'"}})))
+  ;; empty data in the error thrown by :fn
+  (let [plugin (atom {:rpcmethods
+                      {:custom-error
+                       {:fn (fn [params plugin]
+                              (throw
+                               (ex-info "custom-error" {})))}}})
+        req {:jsonrpc "2.0"
+             :id "some-id"
+             :method "custom-error"
+             :params {}}
+        resps (agent nil)
+        out (new java.io.StringWriter)]
+    (plugin/process req plugin resps out)
+    (await resps)
+    (Thread/sleep 100) ;; if we don't wait, out would be empty
+    (is (= (json/read-str (str out) :key-fn keyword)
+           {:jsonrpc "2.0"
+            :id "some-id"
+            :error
+            {:code -32600 :message "Error while processing 'custom-error'"}})))
+  (let [plugin (atom {:rpcmethods
+                      {:execution-error
+                       {:fn (fn [params plugin] (/ 1 0))}}})
+        req {:jsonrpc "2.0"
+             :id "some-id"
+             :method "execution-error"
+             :params {}}
+        resps (agent nil)
+        out (new java.io.StringWriter)]
+    (plugin/process req plugin resps out)
+    (await resps)
+    (Thread/sleep 100) ;; if we don't wait, out would be empty
+    (let [resp (json/read-str (str out) :key-fn keyword)]
+      (is (= (dissoc (:error resp) :stacktrace)
+             {:code -32600 :message "Error while processing 'execution-error'"}))
+      (is (= (-> resp :error :stacktrace str/split-lines first)
+             "java.lang.ArithmeticException: Divide by zero")))))
 
 (deftest read-test
   (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}
