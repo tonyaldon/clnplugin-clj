@@ -410,17 +410,17 @@
                       :dynamic true
                       :getmanifest {:allow-deprecated-apis false}
                       :init-fn (fn [req plugin]
-                                 (swap! plugin assoc-in [:set-by-init-fn] "init-fn"))})
+                                 (swap! plugin assoc-in [:set-by-init-fn] "init-fn"))
+                      :_out (new java.io.StringWriter)})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {:foo "foo-value"
                                 :bar "bar-value"}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
-                                      :rpc-file "lightning-rpc"}}}
-        out (new java.io.StringWriter)]
-    (plugin/process-init! req plugin out)
-    (is (= (json/read-str (str out) :key-fn keyword)
+                                      :rpc-file "lightning-rpc"}}}]
+    (plugin/process-init! req plugin)
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
            {:jsonrpc "2.0" :id 0 :result {}}))
-    (is (= (dissoc @plugin :init-fn)
+    (is (= (dissoc @plugin :init-fn :_out)
            {:options {:foo {:value "foo-value"}
                       :bar {:default "bar-default"
                             :value "bar-value"}
@@ -435,16 +435,16 @@
             :socket-file "/tmp/l1-regtest/regtest/lightning-rpc"
             :set-by-init-fn "init-fn"})))
   (let [plugin (atom {:options {} :rpcmethods {} :dynamic true
-                      :getmanifest {:allow-deprecated-apis false}})
+                      :getmanifest {:allow-deprecated-apis false}
+                      :_out (new java.io.StringWriter)})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
-                                      :rpc-file "lightning-rpc"}}}
-        out (new java.io.StringWriter)]
-    (plugin/process-init! req plugin out)
-    (is (= (json/read-str (str out) :key-fn keyword)
+                                      :rpc-file "lightning-rpc"}}}]
+    (plugin/process-init! req plugin)
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
            {:jsonrpc "2.0" :id 0 :result {}}))
-    (is (= @plugin
+    (is (= (dissoc @plugin :_out)
            {:options {}
             :rpcmethods {}
             :dynamic true
@@ -460,13 +460,13 @@
                            :rpcmethods {}
                            :dynamic true
                            :getmanifest {:allow-deprecated-apis false}
-                           :init-fn 'not-a-function})
+                           :init-fn 'not-a-function
+                           :_out (new java.io.StringWriter)})
              req {:jsonrpc "2.0" :id 0 :method "init"
                   :params {:options {}
                            :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
-                                           :rpc-file "lightning-rpc"}}}
-             out (new java.io.StringWriter)]
-         (plugin/process-init! req plugin out)))))
+                                           :rpc-file "lightning-rpc"}}}]
+         (plugin/process-init! req plugin)))))
 
 (deftest setconfig!-test
   (let [plugin (atom {:options {:foo {:dynamic true}}})

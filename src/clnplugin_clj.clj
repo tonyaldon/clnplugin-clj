@@ -158,12 +158,13 @@
 
 (defn process-init!
   "..."
-  [req plugin out]
+  [req plugin]
   (let [dir (get-in req [:params :configuration :lightning-dir])
         rpc-file (get-in req [:params :configuration :rpc-file])
         socket-file (str (clojure.java.io/file dir rpc-file))
         options (get-in req [:params :options])
-        resp {:jsonrpc "2.0" :id (:id req) :result {}}]
+        resp {:jsonrpc "2.0" :id (:id req) :result {}}
+        out (:_out @plugin)]
     (swap! plugin assoc-in [:socket-file] socket-file)
     (set-options-at-init! options plugin)
     (add-req-params-to-plugin! req plugin)
@@ -266,7 +267,7 @@
   (default! plugin)
   (swap! plugin assoc :_out *out*)
   (process-getmanifest! (read *in*) plugin)
-  (process-init! (read *in*) plugin *out*)
+  (process-init! (read *in*) plugin)
   (add-rpcmethod-to-plugin! :setconfig setconfig! plugin)
 
   (let [resps (agent nil)]
