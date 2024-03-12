@@ -127,10 +127,11 @@
 
 (defn process-getmanifest!
   "..."
-  [req plugin out]
-  (add-req-params-to-plugin! req plugin)
-  (json/write (gm-resp req plugin) out :escape-slash false)
-  (. out (flush)))
+  [req plugin]
+  (let [out (:_out @plugin)]
+    (add-req-params-to-plugin! req plugin)
+    (json/write (gm-resp req plugin) out :escape-slash false)
+    (. out (flush))))
 
 (defn set-option!
   "..."
@@ -263,13 +264,13 @@
 
 (defn run [plugin]
   (default! plugin)
-  (process-getmanifest! (read *in*) plugin *out*)
+  (swap! plugin assoc :_out *out*)
+  (process-getmanifest! (read *in*) plugin)
   (process-init! (read *in*) plugin *out*)
   (add-rpcmethod-to-plugin! :setconfig setconfig! plugin)
 
   (let [resps (agent nil)]
     (swap! plugin assoc :_resps resps)
-    (swap! plugin assoc :_out *out*)
     (loop [req (read *in*)]
       (when req
         (process req plugin resps *out*)

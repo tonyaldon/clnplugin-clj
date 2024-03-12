@@ -316,11 +316,11 @@
 (deftest process-getmanifest!-test
   (let [plugin (atom {:options {:opt 'opt}
                       :rpcmethods {:foo 'foo}
-                      :dynamic true})
-        req {:jsonrpc "2.0" :id 0 :method "getmanifest" :params {:allow-deprecated-apis false}}
-        out (new java.io.StringWriter)]
-    (plugin/process-getmanifest! req plugin out)
-    (is (= (json/read-str (str out) :key-fn keyword)
+                      :dynamic true
+                      :_out (new java.io.StringWriter)})
+        req {:jsonrpc "2.0" :id 0 :method "getmanifest" :params {:allow-deprecated-apis false}}]
+    (plugin/process-getmanifest! req plugin)
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
            {:jsonrpc "2.0"
             :id 0
             :result {:options [{:name "opt" :type "string" :description ""}]
