@@ -132,6 +132,14 @@
     (doseq [opt (seq options)]
       (set-option! opt plugin :at-init))))
 
+(defn stacktrace
+  "..."
+  [exception]
+  (let [sw (new java.io.StringWriter)
+        pw (new java.io.PrintWriter sw)]
+    (.printStackTrace exception pw)
+    (str sw)))
+
 (defn process-init!
   "..."
   [req plugin]
@@ -139,18 +147,25 @@
         rpc-file (get-in req [:params :configuration :rpc-file])
         socket-file (str (clojure.java.io/file dir rpc-file))
         options (get-in req [:params :options])
-        resp {:jsonrpc "2.0" :id (:id req) :result {}}
-        out (:_out @plugin)]
-    (swap! plugin assoc-in [:socket-file] socket-file)
-    (set-options-at-init! options plugin)
-    (add-req-params-to-plugin! req plugin)
-    (when-let [init-fn (:init-fn @plugin)]
-      (if (fn? init-fn)
-        (init-fn req plugin)
-        (throw
-         (let [msg (format "Cannot initialize plugin.  :init-fn must be a function not '%s' which is an instance of '%s'"
-                           init-fn (class init-fn))]
-           (ex-info msg {:error {:code -32600 :message msg}})))))
+        out (:_out @plugin)
+        _ (swap! plugin assoc-in [:socket-file] socket-file)
+        _ (set-options-at-init! options plugin)
+        _ (add-req-params-to-plugin! req plugin)
+        ok-or-disable
+        (if-let [init-fn (:init-fn @plugin)]
+          (if (fn? init-fn)
+            (try
+              (let [result (init-fn req plugin)]
+                (if (and (map? result) (contains? result :disable))
+                  result
+                  {}))
+              (catch Exception e
+                {:disable (stacktrace e)}))
+            (let [msg (format ":init-fn must be a function not '%s' which is an instance of '%s'"
+                              init-fn (class init-fn))]
+              {:disable msg}))
+          {})
+        resp (assoc {:jsonrpc "2.0" :id (:id req)} :result ok-or-disable)]
     (json/write resp out :escape-slash false)
     (. out (flush))))
 
@@ -189,14 +204,6 @@
            (notif "log" {:level level :message msg}))]
      (send (:_resps @plugin) write notifs (:_out @plugin)))
    nil))
-
-(defn stacktrace
-  "..."
-  [exception]
-  (let [sw (new java.io.StringWriter)
-        pw (new java.io.PrintWriter sw)]
-    (.printStackTrace exception pw)
-    (str sw)))
 
 (defn process
   "..."

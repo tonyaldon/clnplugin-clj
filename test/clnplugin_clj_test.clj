@@ -399,20 +399,48 @@
                    :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                    :rpc-file "lightning-rpc"}}
             :socket-file "/tmp/l1-regtest/regtest/lightning-rpc"})))
-  (is (thrown-with-msg?
-       Throwable
-       #"Cannot initialize plugin.  :init-fn must be a function not 'not-a-function' which is an instance of 'class clojure.lang.Symbol'"
-       (let [plugin (atom {:options {}
-                           :rpcmethods {}
-                           :dynamic true
-                           :getmanifest {:allow-deprecated-apis false}
-                           :init-fn 'not-a-function
-                           :_out (new java.io.StringWriter)})
-             req {:jsonrpc "2.0" :id 0 :method "init"
-                  :params {:options {}
-                           :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
-                                           :rpc-file "lightning-rpc"}}}]
-         (plugin/process-init! req plugin)))))
+  (let [plugin (atom {:options {}
+                      :rpcmethods {}
+                      :dynamic true
+                      :getmanifest {:allow-deprecated-apis false}
+                      :init-fn 'not-a-function
+                      :_out (new java.io.StringWriter)})
+        req {:jsonrpc "2.0" :id 0 :method "init"
+             :params {:options {}
+                      :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                      :rpc-file "lightning-rpc"}}}]
+    (plugin/process-init! req plugin)
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+           {:jsonrpc "2.0" :id 0
+            :result {:disable ":init-fn must be a function not 'not-a-function' which is an instance of 'class clojure.lang.Symbol'"}})))
+  (let [plugin (atom {:options {}
+                      :rpcmethods {}
+                      :dynamic true
+                      :getmanifest {:allow-deprecated-apis false}
+                      :init-fn (fn [req plugin] (/ 1 0))
+                      :_out (new java.io.StringWriter)})
+        req {:jsonrpc "2.0" :id 0 :method "init"
+             :params {:options {}
+                      :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                      :rpc-file "lightning-rpc"}}}]
+    (plugin/process-init! req plugin)
+    (let [resp (json/read-str (str (:_out @plugin)) :key-fn keyword)]
+      (is (= (-> resp :result :disable str/split-lines first)
+             "java.lang.ArithmeticException: Divide by zero"))))
+  (let [plugin (atom {:options {}
+                      :rpcmethods {}
+                      :dynamic true
+                      :getmanifest {:allow-deprecated-apis false}
+                      :init-fn (fn [req plugin] {:disable "disabled by user"})
+                      :_out (new java.io.StringWriter)})
+        req {:jsonrpc "2.0" :id 0 :method "init"
+             :params {:options {}
+                      :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                      :rpc-file "lightning-rpc"}}}]
+    (plugin/process-init! req plugin)
+    (let [resp (json/read-str (str (:_out @plugin)) :key-fn keyword)]
+      (is (= (-> resp :result :disable str/split-lines first)
+             "disabled by user")))))
 
 (deftest setconfig!-test
   (let [plugin (atom {:options {:foo {:dynamic true}}})

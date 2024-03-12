@@ -22,6 +22,17 @@ def test_init(node_factory):
     assert l1.rpc.call("get-plugin-options-values") == {"foo": "foo-plugin-restarted",
                                                         "bar": "bar-plugin-restarted"}
 
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_not_a_function")
+    with pytest.raises(RpcError, match=r":init-fn must be a function"):
+        l1.rpc.plugin_start(plugin)
+
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_execution_error")
+    with pytest.raises(RpcError, match=r"java.lang.ArithmeticException"):
+        l1.rpc.plugin_start(plugin)
+
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable")
+    with pytest.raises(RpcError, match=r"disabled by user"):
+        l1.rpc.plugin_start(plugin)
 
 def test_dynamic_options(node_factory):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/dynamic_options")
