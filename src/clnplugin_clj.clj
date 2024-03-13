@@ -138,7 +138,7 @@
   (let [sw (new java.io.StringWriter)
         pw (new java.io.PrintWriter sw)]
     (.printStackTrace exception pw)
-    (str sw)))
+    (str/replace (str sw) "\t" "  ")))
 
 (defn process-init!
   "..."
@@ -192,6 +192,7 @@
   [_ resps out]
   (doseq [r resps]
     (json/write r out :escape-slash false)
+    (. out (append "\n\n")) ;; required by lightningd
     (. out (flush))))
 
 (defn log
@@ -214,15 +215,19 @@
           result-or-error
           (try {:result (method-fn (:params req) plugin)}
                (catch clojure.lang.ExceptionInfo e
-                 {:error (merge {:code -32600
-                                 :message (format "Error while processing '%s'"
-                                                  (:method req))}
-                                (:error (ex-data e)))})
+                 (let [msg (format "Error while processing '%s'" req)
+                       error (merge {:code -32600 :message msg}
+                                    (:error (ex-data e)))]
+                   (log plugin msg "debug")
+                   (log plugin (format "%s" error) "debug")
+                   {:error error}))
                (catch Exception e
-                 {:error {:code -32600
-                          :message (format "Error while processing '%s'"
-                                           (:method req))
-                          :stacktrace (stacktrace e)}}))
+                 (let [msg (format "Error while processing '%s'" req)]
+                   (log plugin msg "debug")
+                   (log plugin (stacktrace e) "debug")
+                   {:error {:code -32600
+                            :message msg
+                            :stacktrace (stacktrace e)}})))
           resp (merge {:jsonrpc "2.0" :id (:id req)}
                       result-or-error)
           out (:_out @plugin)

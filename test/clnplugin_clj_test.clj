@@ -517,9 +517,8 @@
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
     (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
-           {:jsonrpc "2.0"
-            :id "some-id"
-            :result {:bar "baz"}})))
+           {:jsonrpc "2.0" :id "some-id" :result {:bar "baz"}})))
+  ;; Custom errors raised by user
   (let [plugin (atom {:rpcmethods
                       {:custom-error
                        {:fn (fn [params plugin]
@@ -529,18 +528,25 @@
                                                {:code -100 :message msg}}))))}}
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
-        req {:jsonrpc "2.0"
-             :id "some-id"
-             :method "custom-error"
-             :params {}}]
+        req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
     (plugin/process req plugin)
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
-           {:jsonrpc "2.0"
-            :id "some-id"
-            :error
-            {:code -100 :message "custom-error"}})))
+    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
+          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
+          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+      (is (= resp
+             {:jsonrpc "2.0"
+              :id "some-id"
+              :error
+              {:code -100 :message "custom-error"}}))
+      (is (some #(re-find #"Error while processing.*method.*custom-error"
+                          (get-in % [:params :message]))
+                resp-and-logs))
+      (is (some #(re-find #"code.*-100.*message.*custom-error"
+                          (get-in % [:params :message]))
+                resp-and-logs))))
+
   ;; missing :code key in the error thrown by :fn
   ;; so it is set to -326000
   (let [plugin (atom {:rpcmethods
@@ -551,18 +557,18 @@
                                  (ex-info msg {:error {:message msg}}))))}}
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
-        req {:jsonrpc "2.0"
-             :id "some-id"
-             :method "custom-error"
-             :params {}}]
+        req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
     (plugin/process req plugin)
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
-           {:jsonrpc "2.0"
-            :id "some-id"
-            :error
-            {:code -32600 :message "custom-error"}})))
+    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
+          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
+          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+      (is (= resp
+             {:jsonrpc "2.0"
+              :id "some-id"
+              :error
+              {:code -32600 :message "custom-error"}}))))
   ;; missing :message key in the error thrown by :fn
   (let [plugin (atom {:rpcmethods
                       {:custom-error
@@ -571,18 +577,16 @@
                                (ex-info "custom-error" {:error {:code -100}})))}}
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
-        req {:jsonrpc "2.0"
-             :id "some-id"
-             :method "custom-error"
-             :params {}}]
+        req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
     (plugin/process req plugin)
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
-           {:jsonrpc "2.0"
-            :id "some-id"
-            :error
-            {:code -100 :message "Error while processing 'custom-error'"}})))
+    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
+          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
+          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+      (is (= (get-in resp [:error :code]) -100))
+      (is (re-find #"Error while processing.*method.*custom-error"
+                   (get-in resp [:error :message])))))
   ;; empty data in the error thrown by :fn
   (let [plugin (atom {:rpcmethods
                       {:custom-error
@@ -591,35 +595,42 @@
                                (ex-info "custom-error" {})))}}
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
-        req {:jsonrpc "2.0"
-             :id "some-id"
-             :method "custom-error"
-             :params {}}]
+        req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
     (plugin/process req plugin)
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
-           {:jsonrpc "2.0"
-            :id "some-id"
-            :error
-            {:code -32600 :message "Error while processing 'custom-error'"}})))
+    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
+          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
+          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+      (is (= (get-in resp [:error :code]) -32600))
+      (is (re-find #"Error while processing.*method.*custom-error"
+                   (get-in resp [:error :message])))))
+  ;; Execution errors
   (let [plugin (atom {:rpcmethods
                       {:execution-error
                        {:fn (fn [params plugin] (/ 1 0))}}
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
-        req {:jsonrpc "2.0"
-             :id "some-id"
-             :method "execution-error"
-             :params {}}]
+        req {:jsonrpc "2.0" :id "some-id" :method "execution-error" :params {}}]
     (plugin/process req plugin)
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [resp (json/read-str (str (:_out @plugin)) :key-fn keyword)]
-      (is (= (dissoc (:error resp) :stacktrace)
-             {:code -32600 :message "Error while processing 'execution-error'"}))
+    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
+          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
+          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+      (is (= (get-in resp [:error :code]) -32600))
+      (is (re-find #"Error while processing.*method.*execution-error"
+                   (get-in resp [:error :message])))
       (is (= (-> resp :error :stacktrace str/split-lines first)
-             "java.lang.ArithmeticException: Divide by zero")))))
+             "java.lang.ArithmeticException: Divide by zero"))
+      (is (some #(re-find #"Error while processing.*method.*execution-error"
+                          (get-in % [:params :message]))
+                resp-and-logs))
+      (is (some #(= % {:jsonrpc "2.0"
+                       :method "log"
+                       :params {:level "debug"
+                                :message "java.lang.ArithmeticException: Divide by zero"}})
+                resp-and-logs)))))
 
 (deftest read-test
   (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}

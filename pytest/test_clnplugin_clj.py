@@ -91,8 +91,12 @@ def test_errors(node_factory):
     l1 = node_factory.get_node(options={"plugin": plugin})
     with pytest.raises(RpcError, match=r"custom-error"):
         l1.rpc.call("custom-error")
-    with pytest.raises(RpcError, match=r"Error while processing 'execution-error'"):
+    assert l1.daemon.is_in_log(r"Error while processing.*method.*custom-error")
+    assert l1.daemon.is_in_log(r"code.*-100.*message.*custom-error")
+    with pytest.raises(RpcError, match=r"Error while processing.*method.*execution-error"):
         l1.rpc.call("execution-error")
+    assert l1.daemon.is_in_log(r"Error while processing.*method.*execution-error")
+    assert l1.daemon.is_in_log(r"java.lang.ArithmeticException: Divide by zero")
 
 
 def test_log(node_factory):
