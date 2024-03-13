@@ -34,6 +34,21 @@ def test_init(node_factory):
     with pytest.raises(RpcError, match=r"disabled by user"):
         l1.rpc.plugin_start(plugin)
 
+
+def test_deprecated_options(node_factory):
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/deprecated_options")
+
+    l1 = node_factory.get_node(options={'allow-deprecated-apis': False})
+    with pytest.raises(RpcError, match=r"deprecated option"):
+        l1.rpc.plugin_start(plugin=plugin, foo_deprecated="foo-value")
+
+    l2 = node_factory.get_node(options={'allow-deprecated-apis': True})
+    l2.rpc.plugin_start(plugin=plugin, foo_deprecated="foo-value")
+    listconfigs_resp = l2.rpc.listconfigs()
+    assert listconfigs_resp["configs"]["foo_deprecated"]["value_str"] == "foo-value"
+    assert l2.rpc.call("get-foo_deprecated-value") == {"foo_deprecated": "foo-value"}
+
+
 def test_dynamic_options(node_factory):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/dynamic_options")
     l1 = node_factory.get_node(options={"plugin": plugin})
@@ -55,18 +70,30 @@ def test_dynamic_options(node_factory):
     assert l1.rpc.call("get-foo-dynamic-value") == {"foo-dynamic": "foo-value-1"}
 
 
-def test_deprecated_options(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/deprecated_options")
+def test_log(node_factory):
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/log")
+    l1 = node_factory.get_node(options={"plugin": plugin})
+    l1.rpc.call("log-info")
+    assert l1.daemon.is_in_log(r"INFO.*logged by 'log-info'")
+    l1.rpc.call("log-debug")
+    assert l1.daemon.is_in_log(r"DEBUG.*logged by 'log-debug'")
+    l1.rpc.call("log-multi-lines")
+    assert l1.daemon.is_in_log(r"line 0 - logged by 'log-multi-lines'")
+    assert l1.daemon.is_in_log(r"line 1 - logged by 'log-multi-lines'")
+    assert l1.daemon.is_in_log(r"line 2 - logged by 'log-multi-lines'")
 
-    l1 = node_factory.get_node(options={'allow-deprecated-apis': False})
-    with pytest.raises(RpcError, match=r"deprecated option"):
-        l1.rpc.plugin_start(plugin=plugin, foo_deprecated="foo-value")
 
-    l2 = node_factory.get_node(options={'allow-deprecated-apis': True})
-    l2.rpc.plugin_start(plugin=plugin, foo_deprecated="foo-value")
-    listconfigs_resp = l2.rpc.listconfigs()
-    assert listconfigs_resp["configs"]["foo_deprecated"]["value_str"] == "foo-value"
-    assert l2.rpc.call("get-foo_deprecated-value") == {"foo_deprecated": "foo-value"}
+def test_errors(node_factory):
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/errors")
+    l1 = node_factory.get_node(options={"plugin": plugin})
+    with pytest.raises(RpcError, match=r"custom-error"):
+        l1.rpc.call("custom-error")
+    assert l1.daemon.is_in_log(r"Error while processing.*method.*custom-error")
+    assert l1.daemon.is_in_log(r"code.*-100.*message.*custom-error")
+    with pytest.raises(RpcError, match=r"Error while processing.*method.*execution-error"):
+        l1.rpc.call("execution-error")
+    assert l1.daemon.is_in_log(r"Error while processing.*method.*execution-error")
+    assert l1.daemon.is_in_log(r"java.lang.ArithmeticException: Divide by zero")
 
 
 def test_async(node_factory, executor):
@@ -84,29 +111,3 @@ def test_async(node_factory, executor):
     assert counter == {1,2,3}
     # ensure the call to the method `async` are processed asynchronously
     assert delta < 1.5
-
-
-def test_errors(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/errors")
-    l1 = node_factory.get_node(options={"plugin": plugin})
-    with pytest.raises(RpcError, match=r"custom-error"):
-        l1.rpc.call("custom-error")
-    assert l1.daemon.is_in_log(r"Error while processing.*method.*custom-error")
-    assert l1.daemon.is_in_log(r"code.*-100.*message.*custom-error")
-    with pytest.raises(RpcError, match=r"Error while processing.*method.*execution-error"):
-        l1.rpc.call("execution-error")
-    assert l1.daemon.is_in_log(r"Error while processing.*method.*execution-error")
-    assert l1.daemon.is_in_log(r"java.lang.ArithmeticException: Divide by zero")
-
-
-def test_log(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/log")
-    l1 = node_factory.get_node(options={"plugin": plugin})
-    l1.rpc.call("log-info")
-    assert l1.daemon.is_in_log(r"INFO.*logged by 'log-info'")
-    l1.rpc.call("log-debug")
-    assert l1.daemon.is_in_log(r"DEBUG.*logged by 'log-debug'")
-    l1.rpc.call("log-multi-lines")
-    assert l1.daemon.is_in_log(r"line 0 - logged by 'log-multi-lines'")
-    assert l1.daemon.is_in_log(r"line 1 - logged by 'log-multi-lines'")
-    assert l1.daemon.is_in_log(r"line 2 - logged by 'log-multi-lines'")
