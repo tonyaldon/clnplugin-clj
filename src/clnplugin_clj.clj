@@ -27,7 +27,7 @@
 
   If DEPRECATED is true and the user sets `allow-deprecated-apis` to false,
   KW-NAME option is disabled by lightningd and must not be used by the plugin."
-  [[kw-name {:keys [type description default multi dynamic deprecated] :as option}]]
+  [[kw-name {:keys [type description default multi dynamic deprecated]}]]
   ;; Don't check options.  Raising an exception here is useless
   ;; because lightningd won't let us log it or will ignore any json
   ;; response (with an `error` field) to the getmanifest request.
