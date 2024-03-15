@@ -87,20 +87,30 @@
   (swap! plugin #(merge {:options {} :rpcmethods {} :dynamic true}
                         %)))
 
-(defn add-req-params-to-plugin!
-  "Store params of REQ in PLUGIN with key being keyword of REQ's method.
+(defn add-request!
+  "Store params of REQ in PLUGIN.
 
   Use this to store params received from CLN in \"getmanifest\" and
-  \"init\" requests."
+  \"init\" requests.
+
+  For instance, after using that function for \"init\" request,
+  we can get lightningd configuration like this (`plugin` being
+  the atom holding the state of our plugin):
+
+      (get-in plugin [:init :configuration])"
   [req plugin]
   (swap! plugin assoc (keyword (:method req)) (:params req)))
 
 (defn process-getmanifest!
-  "..."
+  "Process REQ being the \"getmanifest\" request received from lightningd.
+
+  We store that REQ in PLUGIN.  See clnplugin-clj/add-request!.
+  We send the response produced by clnplugin-clj/gm-resp."
   [req plugin]
   (let [out (:_out @plugin)]
-    (add-req-params-to-plugin! req plugin)
+    (add-request! req plugin)
     (json/write (gm-resp req plugin) out :escape-slash false)
+    (. out (append "\n\n")) ;; required by lightningd
     (. out (flush))))
 
 (defn set-option!
@@ -144,7 +154,7 @@
         out (:_out @plugin)
         _ (swap! plugin assoc-in [:socket-file] socket-file)
         _ (set-options-at-init! options plugin)
-        _ (add-req-params-to-plugin! req plugin)
+        _ (add-request! req plugin)
         ok-or-disable
         (if-let [init-fn (:init-fn @plugin)]
           (if (fn? init-fn)

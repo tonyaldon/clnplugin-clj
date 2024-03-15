@@ -240,11 +240,11 @@
           :rpcmethods {:foo 'foo}
           :dynamic false})))
 
-(deftest add-req-params-to-plugin!-test
+(deftest add-request!-test
   (is (= (let [plugin (atom nil)
                req {:method "getmanifest"
                     :params {:allow-deprecated-apis false}}]
-           (plugin/add-req-params-to-plugin! req plugin)
+           (plugin/add-request! req plugin)
            @plugin)
          {:getmanifest {:allow-deprecated-apis false}}))
   (is (= (let [plugin (atom nil)
@@ -253,7 +253,7 @@
                     {:options {:bar "BAR"}
                      :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                      :rpc-file "lightning-rpc"}}}]
-           (plugin/add-req-params-to-plugin! req plugin)
+           (plugin/add-request! req plugin)
            @plugin)
          {:init {:options {:bar "BAR"}
                  :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
