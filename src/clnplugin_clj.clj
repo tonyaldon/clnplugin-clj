@@ -186,6 +186,7 @@
           {})
         resp (assoc {:jsonrpc "2.0" :id (:id req)} :result ok-or-disable)]
     (json/write resp out :escape-slash false)
+    (. out (append "\n\n")) ;; required by lightningd
     (. out (flush))))
 
 (defn setconfig!
