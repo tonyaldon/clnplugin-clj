@@ -142,14 +142,17 @@
         (ex-info msg {:error {:code -32600 :message msg}}))))))
 
 (defn set-options-at-init!
-  "..."
+  "Set OPTIONS in PLUGIN.
+
+  This is meant to be used by clnplugin-clj/process-init! when
+  we process lightningd \"init\" request."
   [options plugin]
   (when-not (empty? options)
     (doseq [opt (seq options)]
       (set-option! opt plugin :at-init))))
 
 (defn stacktrace
-  "..."
+  "Return EXCEPTION's stacktrace as a string."
   [exception]
   (let [sw (new java.io.StringWriter)
         pw (new java.io.PrintWriter sw)]
