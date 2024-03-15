@@ -456,13 +456,13 @@
              params {:config "foo", :val "foo-value"}]
          (plugin/setconfig! params plugin)))))
 
-(deftest add-rpcmethod-to-plugin!-test
+(deftest add-rpcmethod!-test
   (let [plugin (atom {:rpcmethods {}})
         foo-fn (fn [params plugin] {:bar "baz"})]
-    (plugin/add-rpcmethod-to-plugin! :foo foo-fn plugin)
+    (plugin/add-rpcmethod! :foo foo-fn plugin)
     (is (= (get-in @plugin [:rpcmethods :foo :fn])
            foo-fn))
-    (plugin/add-rpcmethod-to-plugin! :setconfig plugin/setconfig! plugin)
+    (plugin/add-rpcmethod! :setconfig plugin/setconfig! plugin)
     (is (= (get-in @plugin [:rpcmethods :setconfig :fn])
            plugin/setconfig!))))
 

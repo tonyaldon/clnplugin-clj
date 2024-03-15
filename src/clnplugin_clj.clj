@@ -228,8 +228,17 @@
     (set-option! [kw-opt value] plugin)
     {}))
 
-(defn add-rpcmethod-to-plugin!
-  "..."
+(defn add-rpcmethod!
+  "Add METHOD to :rpcmethods of PLUGIN with :fn being FN.
+
+  The RPC methods should not be added to the plugin state with
+  that function but set when the plugin is first defined.
+
+  Specifically, anything that must be declared to lightningd
+  must be in plugin's state before the getmanifest round.
+
+  See clnplugin-clj/run, clnplugin-clj/gm-resp and
+  clnplugin-clj/setconfig!"
   [method fn plugin]
   (swap! plugin assoc-in [:rpcmethods method] {:fn fn}))
 
@@ -309,7 +318,7 @@
   (swap! plugin assoc :_out *out*)
   (process-getmanifest! (read *in*) plugin)
   (process-init! (read *in*) plugin)
-  (add-rpcmethod-to-plugin! :setconfig setconfig! plugin)
+  (add-rpcmethod! :setconfig setconfig! plugin)
   (swap! plugin assoc :_resps (agent nil))
   (loop [req (read *in*)]
     (when req
