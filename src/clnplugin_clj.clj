@@ -250,7 +250,39 @@
   {:jsonrpc "2.0" :method method :params params})
 
 (defn write
-  "..."
+  "Write to OUT the responses and notifications in RESPS collection.
+
+  Elements in RESPS are responses with :id key
+
+      {:jsonrpc \"2.0\"
+       :id \"some-id\"
+       :result {:foo \"bar\"}}
+
+      or
+
+      {:jsonrpc \"2.0\"
+       :id \"some-id\"
+       :error {:code -32600
+               :message \"Something wrong happened\"}}
+
+  or they are notifications without :id key like this
+
+      {:jsonrpc \"2.0\"
+       :method \"log\"
+       :params {:level \"debug\"
+                :message msg}}
+
+  That function is meant to be an action-fn we send to
+  an agent along with RESPS and OUT.  We use an agent to
+  synchronize writes to OUT.  Specifically, the agent
+  is the value of :_resps key of the plugin.
+
+  Note that to synchronize these writes, we don't need
+  to use the state of the agent which is passed as first
+  argument of any action-fn.  So the first argument of
+  clnplugin-clj/write is ignored.
+
+  See clnplugin-clj/log and clnplugin-clj/process"
   [_ resps out]
   (doseq [r resps]
     (json/write r out :escape-slash false)
