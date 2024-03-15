@@ -91,11 +91,9 @@
   "Store params of REQ in PLUGIN with key being keyword of REQ's method.
 
   Use this to store params received from CLN in \"getmanifest\" and
-  \"init\" request."
+  \"init\" requests."
   [req plugin]
-  (let [method (keyword (:method req))
-        params (:params req)]
-    (swap! plugin #(merge % {method params}))))
+  (swap! plugin assoc (keyword (:method req)) (:params req)))
 
 (defn process-getmanifest!
   "..."
