@@ -84,12 +84,8 @@
 (defn default!
   "Set default values for :dynamic, :options and :rpcmethods keys if omitted."
   [plugin]
-  (swap! plugin
-         (fn [p]
-           (-> p
-               (update :dynamic #(if (nil? %) true %))
-               (update :options #(if (nil? %) {} %))
-               (update :rpcmethods #(if (nil? %) {} %))))))
+  (swap! plugin #(merge {:options {} :rpcmethods {} :dynamic true}
+                        %)))
 
 (defn add-req-params-to-plugin!
   "Store params of REQ in PLUGIN with key being keyword of REQ's method.
