@@ -190,7 +190,38 @@
     (. out (flush))))
 
 (defn setconfig!
-  "..."
+  "Set in PLUGIN the dynamic option specified in PARAMS to its new value.
+
+  This function is meant to be used to process \"setconfig\"
+  requests sent by lightningd.
+
+  When we declare to lightningd that \"foo-opt\" is a dynamic
+  option (during the getmanifest round, see clnplugin-clj/gm-option),
+  that means that the user can use lightningd's JSON RPC command
+  \"setconfig\" to set that option without restarting neither lightningd
+  nor the plugin.
+
+  Let's unfold this.
+
+  When the user wants to set dynamically \"foo-opt\" to \"foo-value\"
+  using `lightning-cli`, he runs the following command
+
+      lightning-cli setconfig foo-opt foo-value
+
+  which triggered lightningd to send us the following \"setconfig\"
+  request:
+
+      {\"jsonrpc\": \"2.0\",
+       \"id\": \"cli:setconfig#49479/cln:setconfig#66752\",
+       \"method\": \"setconfig\",
+       \"params\": {\"config\": \"foo-opt\",
+                  \"val\": \"foo-value\"}}
+
+  Finally, we handle that request with clnplugin-clj/setconfig! which
+
+  - sets the option :foo-opt to \"foo-value\" in :options map
+    of PLUGIN and,
+  - returns an empty map if everything is OK."
   [params plugin]
   (let [kw-opt (keyword (:config params))
         value (:val params)]
