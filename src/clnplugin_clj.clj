@@ -114,17 +114,29 @@
     (. out (flush))))
 
 (defn set-option!
-  "..."
+  "Set KW-OPT to VALUE in PLUGIN.
+
+  If AT-INIT? is false and KW-OPT is not a dynamic option,
+  raise an exception.
+
+  Plugin options must not be set by plugin code but by
+
+  - clnplugin-clj/process-init! when the plugin processes lightningd
+    \"init\" request, or by,
+  - clnplugin-clj/setconfig! when the user dynamically sets a
+    dynamic option with `setconfig` lightningd JSON RPC command.
+
+  See clnplugin-clj/gm-option"
   ([[kw-opt value] plugin]
    (set-option! [kw-opt value] plugin false))
-  ([[kw-opt value] plugin at-init]
+  ([[kw-opt value] plugin at-init?]
    (if (contains? (:options @plugin) kw-opt)
-     (if (or at-init
-             (get-in @plugin [:options kw-opt :dynamic]))
-       (swap! plugin assoc-in [:options kw-opt :value] value)
-       (throw
-        (let [msg (format "Cannot set '%s' option which is not dynamic.  Add ':dynamic true' to its declaration." kw-opt)]
-          (ex-info msg {:error {:code -32600 :message msg}}))))
+     (let [is-dynamic? (get-in @plugin [:options kw-opt :dynamic])]
+       (if (or at-init? is-dynamic?)
+         (swap! plugin assoc-in [:options kw-opt :value] value)
+         (throw
+          (let [msg (format "Cannot set '%s' option which is not dynamic.  Add ':dynamic true' to its declaration." kw-opt)]
+            (ex-info msg {:error {:code -32600 :message msg}})))))
      (throw
       (let [msg (format "Cannot set '%s' option which has not been declared to lightningd" kw-opt)]
         (ex-info msg {:error {:code -32600 :message msg}}))))))
