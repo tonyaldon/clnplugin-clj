@@ -72,7 +72,7 @@
   Note that only :options and :rpcmethods are mandatory.
 
   See clnplugin-clj/gm-rpcmethods, clnplugin-clj/gm-options,
-  and clnplugin-clj/default! ."
+  and clnplugin-clj/set-defaults! ."
   [req plugin]
   (let [p @plugin]
     {:jsonrpc "2.0"
@@ -81,7 +81,7 @@
               :rpcmethods (gm-rpcmethods (:rpcmethods p))
               :dynamic (:dynamic p)}}))
 
-(defn default!
+(defn set-defaults!
   "Set default values for :dynamic, :options and :rpcmethods keys if omitted."
   [plugin]
   (swap! plugin #(merge {:options {} :rpcmethods {} :dynamic true}
@@ -250,7 +250,7 @@
                (recur (str req-acc line) next-line))))))
 
 (defn run [plugin]
-  (default! plugin)
+  (set-defaults! plugin)
   (swap! plugin assoc :_out *out*)
   (process-getmanifest! (read *in*) plugin)
   (process-init! (read *in*) plugin)

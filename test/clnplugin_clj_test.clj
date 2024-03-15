@@ -199,34 +199,34 @@
                      req {:id 16}]
                  (plugin/gm-resp plugin req)))))
 
-(deftest default!-test
+(deftest set-defaults!-test
   (is (= (let [plugin (atom nil)]
-           (plugin/default! plugin)
+           (plugin/set-defaults! plugin)
            @plugin)
          {:options {}
           :rpcmethods {}
           :dynamic true}))
   (is (= (let [plugin (atom {:options {:opt1 'opt1}})]
-           (plugin/default! plugin)
+           (plugin/set-defaults! plugin)
            @plugin)
          {:options {:opt1 'opt1}
           :rpcmethods {}
           :dynamic true}))
   (is (= (let [plugin (atom {:rpcmethods {:foo 'foo}})]
-           (plugin/default! plugin)
+           (plugin/set-defaults! plugin)
            @plugin)
          {:options {}
           :rpcmethods {:foo 'foo}
           :dynamic true}))
   (is (= (let [plugin (atom {:options {:opt1 'opt1}
                              :rpcmethods {:foo 'foo}})]
-           (plugin/default! plugin)
+           (plugin/set-defaults! plugin)
            @plugin)
          {:options {:opt1 'opt1}
           :rpcmethods {:foo 'foo}
           :dynamic true}))
   (is (= (let [plugin (atom {:dynamic false})]
-           (plugin/default! plugin)
+           (plugin/set-defaults! plugin)
            @plugin)
          {:options {}
           :rpcmethods {}
@@ -234,7 +234,7 @@
   (is (= (let [plugin (atom {:options {:opt1 'opt1}
                              :rpcmethods {:foo 'foo}
                              :dynamic false})]
-           (plugin/default! plugin)
+           (plugin/set-defaults! plugin)
            @plugin)
          {:options {:opt1 'opt1}
           :rpcmethods {:foo 'foo}
