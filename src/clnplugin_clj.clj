@@ -290,13 +290,28 @@
     (. out (flush))))
 
 (defn log
-  "..."
+  "Send a \"log\" notification to lightningd with level LEVEL.
+
+  If LEVEL is not specified, it is set to \"info\".  As per
+  common/status_levels.c file, log levels can be:
+
+  - \"io\",
+  - \"debug\",
+  - \"info\",
+  - \"unusual\" (also \"warn\"),
+  - \"broken\" (also \"error\").
+
+  MESSAGE is a string.  If it contains multiple lines, it is split
+  at newline separation and several \"log\" notifications are sent
+  instead of one.  This is useful for sending stacktraces when
+  our plugin stops working correctly and throws exceptions.
+
+  See clnplugin-clj/stacktrace"
   ([plugin message]
    (log plugin message "info"))
   ([plugin message level]
-   (let [notifs
-         (for [msg (str/split-lines message)]
-           (notif "log" {:level level :message msg}))]
+   (let [notifs (map #(notif "log" {:level level :message %})
+                     (str/split-lines message))]
      (send (:_resps @plugin) write notifs (:_out @plugin)))
    nil))
 
