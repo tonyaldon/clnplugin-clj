@@ -64,10 +64,20 @@
 (defn gm-resp
   "Return the response to the getmanifest REQ.
 
-  PLUGIN can contain any key; only the keys :options, :rpcmethods,
-  :subscriptions, :hooks, :featurebits, :notifications, :custommessages,
-  :nonnumericids and :dynamic will retained in the response to be
-  sent to lightningd.
+  PLUGIN can contain any key you want, but only the following
+  keys
+
+  - :options,
+  - :rpcmethods,
+  - :dynamic,
+  - :subscriptions,
+  - :hooks,
+  - :featurebits,
+  - :notifications,
+  - :custommessages,
+  - :nonnumericids
+
+  will retained in the response to be sent to lightningd.
 
   Note that only :options and :rpcmethods are mandatory.
 
