@@ -326,7 +326,24 @@
    nil))
 
 (defn process
-  "..."
+  "Process REQ.
+
+  Check if :method of REQ belong to :rpcmethods map of PLUGIN.
+  If yes, try to apply its :fn function to :params of REQ and
+  PLUGIN:
+
+  1) if no exception is thrown, send back a response to lightningd
+     with :result being the returned value of applying :fn to
+     :params and PLUGIN,
+  2) if an exception is thrown, use it as the value of :error
+     key of the response to lightningd.  In that case, we log
+     the stacktrace of the exception.  See clnplugin-clj/stacktrace
+     and clnplugin-clj/log .
+
+  All the processing is done in a go block.
+
+  Writes to :_out of PLUGIN are synchronized with :_resps agent and
+  clnplugin-clj/write action function."
   [req plugin]
   (go
     (let [method (keyword (:method req))
@@ -362,13 +379,13 @@
     (loop [req-acc "" line (read-line)]
       (cond
         (nil? line) nil
-        (empty? line)
-        (try
-          (json/read-str req-acc :key-fn keyword)
-          (catch Exception e
-            (throw
-             (let [msg (format "Invalid token in json input: '%s'" req-acc)]
-               (ex-info msg {:error {:code -32600 :message msg}})))))
+        ;; lightningd requests end with an empty line "\n\n".
+        (empty? line) (try
+                        (json/read-str req-acc :key-fn keyword)
+                        (catch Exception e
+                          (throw
+                           (let [msg (format "Invalid token in json input: '%s'" req-acc)]
+                             (ex-info msg {:error {:code -32600 :message msg}})))))
         true (let [next-line (read-line)]
                (recur (str req-acc line) next-line))))))
 
