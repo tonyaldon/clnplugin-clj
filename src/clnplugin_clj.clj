@@ -243,7 +243,9 @@
   (swap! plugin assoc-in [:rpcmethods method] {:fn fn}))
 
 (defn notif
-  "..."
+  "Return a METHOD notification with PARAMS to be send to lightningd.
+
+  As this is a notification, the returned map contains no :id key."
   [method params]
   {:jsonrpc "2.0" :method method :params params})
 
