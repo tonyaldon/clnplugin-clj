@@ -425,21 +425,27 @@
           method-fn (let [fn (get-in (:rpcmethods @plugin) [method :fn])]
                       (if (symbol? fn) (eval fn) fn))
           result-or-error
-          (try {:result (method-fn (:params req) plugin)}
-               (catch clojure.lang.ExceptionInfo e
-                 (let [msg (format "Error while processing '%s'" req)
-                       error (merge {:code -32600 :message msg}
-                                    (:error (ex-data e)))]
-                   (log plugin msg "debug")
-                   (log plugin (format "%s" error) "debug")
-                   {:error error}))
-               (catch Exception e
-                 (let [msg (format "Error while processing '%s'" req)]
-                   (log plugin msg "debug")
-                   (log plugin (stacktrace e) "debug")
-                   {:error {:code -32600
-                            :message msg
-                            :stacktrace (stacktrace e)}})))
+          (try
+            (if (fn? method-fn)
+              {:result (method-fn (:params req) plugin)}
+              (let [msg (format "Error while processing '%s' method, '%s' value of :fn is not a function"
+                                method method-fn)]
+                (log plugin msg "debug")
+                {:error {:code -32600 :message msg}}))
+            (catch clojure.lang.ExceptionInfo e
+              (let [msg (format "Error while processing '%s'" req)
+                    error (merge {:code -32600 :message msg}
+                                 (:error (ex-data e)))]
+                (log plugin msg "debug")
+                (log plugin (format "%s" error) "debug")
+                {:error error}))
+            (catch Exception e
+              (let [msg (format "Error while processing '%s'" req)]
+                (log plugin msg "debug")
+                (log plugin (stacktrace e) "debug")
+                {:error {:code -32600
+                         :message msg
+                         :stacktrace (stacktrace e)}})))
           resp (merge {:jsonrpc "2.0" :id (:id req)}
                       result-or-error)
           out (:_out @plugin)

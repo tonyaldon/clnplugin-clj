@@ -101,6 +101,9 @@ def test_errors(node_factory):
         l1.rpc.call("execution-error")
     assert l1.daemon.is_in_log(r"Error while processing.*method.*execution-error")
     assert l1.daemon.is_in_log(r"java.lang.ArithmeticException: Divide by zero")
+    with pytest.raises(RpcError, match=r"Error while processing.*:not-a-function.*method, .*[:a-vector \"is not a function\"].*value of :fn is not a function"):
+        l1.rpc.call("not-a-function")
+    assert l1.daemon.is_in_log(r"Error while processing.*:not-a-function.*method, .*[:a-vector \"is not a function\"].*value of :fn is not a function")
     with pytest.raises(RpcError, match=r"Error while processing.*:method.*non-json-writable-in-result"):
         l1.rpc.call("non-json-writable-in-result")
     assert l1.daemon.is_in_log(r"Error while processing.*method.*non-json-writable-in-result")

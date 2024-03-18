@@ -9,8 +9,8 @@
                   (let [msg "custom-error"]
                     (ex-info msg {:error
                                   {:code -100 :message msg}}))))}
-          :execution-error
-          {:fn (fn [params plugin] (/ 1 0))}
+          :execution-error {:fn (fn [params plugin] (/ 1 0))}
+          :not-a-function {:fn [:a-vector "is not a function"]}
           :non-json-writable-in-result
           {:fn (fn [params plugin]
                  ;; `swap!` returns new value of plugin
