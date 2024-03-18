@@ -599,10 +599,12 @@
 
 (deftest process-test
   (let [foo-2 (fn [params plugin] {:bar-2 "baz-2"})
+        _ (defn foo-3 [params plugin] {:bar-3 "baz-3"})
         plugin (atom {:rpcmethods
                       {:foo-0 {:fn (fn [params plugin] {:bar "baz"})}
                        :foo-1 {:fn (fn [params plugin] {:bar-1 (:baz-1 params)})}
                        :foo-2 {:fn foo-2}
+                       :foo-3 {:fn 'clnplugin-clj-test/foo-3}
                        :foo-4 {:fn (fn [params plugin]
                                      (swap! plugin assoc :bar-4 "baz-4")
                                      {})}
@@ -614,6 +616,7 @@
         req-0 {:jsonrpc "2.0" :id "id-0" :method "foo-0" :params {}}
         req-1 {:jsonrpc "2.0" :id "id-1" :method "foo-1" :params {:baz-1 "baz-1"}}
         req-2 {:jsonrpc "2.0" :id "id-2" :method "foo-2" :params {}}
+        req-3 {:jsonrpc "2.0" :id "id-3" :method "foo-3" :params {}}
         req-4 {:jsonrpc "2.0" :id "id-4" :method "foo-4" :params {}}
         req-5 {:jsonrpc "2.0" :id "id-5" :method "foo-5" :params {}}]
     (plugin/process req-0 plugin)
@@ -621,6 +624,8 @@
     (plugin/process req-1 plugin)
     (Thread/sleep 100)
     (plugin/process req-2 plugin)
+    (Thread/sleep 100)
+    (plugin/process req-3 plugin)
     (Thread/sleep 100)
     (plugin/process req-4 plugin)
     (Thread/sleep 100)
@@ -633,6 +638,7 @@
              '({:jsonrpc "2.0" :id "id-0" :result {:bar "baz"}}
                {:jsonrpc "2.0" :id "id-1" :result {:bar-1 "baz-1"}}
                {:jsonrpc "2.0" :id "id-2" :result {:bar-2 "baz-2"}}
+               {:jsonrpc "2.0" :id "id-3" :result {:bar-3 "baz-3"}}
                {:jsonrpc "2.0" :id "id-4" :result {}}
                {:jsonrpc "2.0" :id "id-5" :result {:bar-5 "baz-4"}})))))
 

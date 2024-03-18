@@ -422,7 +422,8 @@
   [req plugin]
   (go
     (let [method (keyword (:method req))
-          method-fn (get-in (:rpcmethods @plugin) [method :fn])
+          method-fn (let [fn (get-in (:rpcmethods @plugin) [method :fn])]
+                      (if (symbol? fn) (eval fn) fn))
           result-or-error
           (try {:result (method-fn (:params req) plugin)}
                (catch clojure.lang.ExceptionInfo e

@@ -9,6 +9,7 @@ def test_foo(node_factory):
     assert l1.rpc.call("foo-0") == {"bar": "baz"}
     assert l1.rpc.call("foo-1", {"baz-1": "baz-1"}) == {"bar-1": "baz-1"}
     assert l1.rpc.call("foo-2") == {"bar-2": "baz-2"}
+    assert l1.rpc.call("foo-3") == {"bar-3": "baz-3"}
     # foo-4 must be call before foo-5 because it sets a value in plugin atom
     # that we want to get with foo-5
     assert l1.rpc.call("foo-4") == {}
