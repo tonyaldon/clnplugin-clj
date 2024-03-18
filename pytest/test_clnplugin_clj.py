@@ -34,7 +34,7 @@ def test_init(node_factory):
         l1.rpc.plugin_start(plugin)
 
     plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_execution_error")
-    with pytest.raises(RpcError, match=r"java.lang.ArithmeticException"):
+    with pytest.raises(RpcError, match=r"#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"):
         l1.rpc.plugin_start(plugin)
 
     plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable")
@@ -100,7 +100,7 @@ def test_errors(node_factory):
     with pytest.raises(RpcError, match=r"Error while processing.*method.*execution-error"):
         l1.rpc.call("execution-error")
     assert l1.daemon.is_in_log(r"Error while processing.*method.*execution-error")
-    assert l1.daemon.is_in_log(r"java.lang.ArithmeticException: Divide by zero")
+    assert l1.daemon.is_in_log(r":cause.*Divide by zero")
     with pytest.raises(RpcError, match=r"Error while processing.*:not-a-function.*method, .*[:a-vector \"is not a function\"].*value of :fn is not a function"):
         l1.rpc.call("not-a-function")
     assert l1.daemon.is_in_log(r"Error while processing.*:not-a-function.*method, .*[:a-vector \"is not a function\"].*value of :fn is not a function")

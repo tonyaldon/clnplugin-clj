@@ -425,8 +425,9 @@
                                       :rpc-file "lightning-rpc"}}}]
     (plugin/process-init! req plugin)
     (let [resp (json/read-str (str (:_out @plugin)) :key-fn keyword)]
-      (is (= (-> resp :result :disable str/split-lines first)
-             "java.lang.ArithmeticException: Divide by zero"))))
+      (is (re-find
+           #"(?s)#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
+           (get-in resp [:result :disable])))))
   (let [plugin (atom {:options {}
                       :rpcmethods {}
                       :dynamic true
@@ -745,15 +746,16 @@
       (is (= (get-in resp [:error :code]) -32600))
       (is (re-find #"Error while processing.*method.*execution-error"
                    (get-in resp [:error :message])))
-      (is (= (-> resp :error :stacktrace str/split-lines first)
-             "java.lang.ArithmeticException: Divide by zero"))
+      (is (re-find
+           #"(?s)#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
+           (get-in resp [:error :exception])))
       (is (some #(re-find #"Error while processing.*method.*execution-error"
                           (get-in % [:params :message]))
                 resp-and-logs))
       (is (some #(= % {:jsonrpc "2.0"
                        :method "log"
                        :params {:level "debug"
-                                :message "java.lang.ArithmeticException: Divide by zero"}})
+                                :message " :cause \"Divide by zero\""}})
                 resp-and-logs))))
   ;; error because :fn is not a function
   (let [plugin (atom {:rpcmethods

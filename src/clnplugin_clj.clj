@@ -161,13 +161,12 @@
     (doseq [opt (seq options)]
       (set-option! opt plugin :at-init))))
 
-(defn stacktrace
-  "Return EXCEPTION's stacktrace as a string."
-  [exception]
-  (let [sw (new java.io.StringWriter)
-        pw (new java.io.PrintWriter sw)]
-    (.printStackTrace exception pw)
-    (str/replace (str sw) "\t" "  ")))
+(defn exception
+  "..."
+  [e]
+  (let [sw (new java.io.StringWriter)]
+    (print-method e sw)
+    (str sw)))
 
 (defn process-init!
   "..."
@@ -189,7 +188,7 @@
                   result
                   {}))
               (catch Exception e
-                {:disable (stacktrace e)}))
+                {:disable (exception e)}))
             (let [msg (format ":init-fn must be a function not '%s' which is an instance of '%s'"
                               init-fn (class init-fn))]
               {:disable msg}))
@@ -276,13 +275,6 @@
     (print-method x sw)
     ;; json/write-string is private to clojure.data.json library!
     (#'json/write-string (str sw) out options)))
-
-(defn exception
-  "..."
-  [e]
-  (let [sw (new java.io.StringWriter)]
-    (print-method e sw)
-    (str sw)))
 
 (defn- log-
   "..."
@@ -388,10 +380,10 @@
 
   MESSAGE is a string.  If it contains multiple lines, it is split
   at newline separation and several \"log\" notifications are sent
-  instead of one.  This is useful for sending stacktraces when
+  instead of one.  This is useful for sending exceptions when
   our plugin stops working correctly and throws exceptions.
 
-  See clnplugin-clj/stacktrace"
+  See clnplugin-clj/exception"
   ([plugin message]
    (log plugin message "info"))
   ([plugin message level]
@@ -412,8 +404,7 @@
      :params and PLUGIN,
   2) if an exception is thrown, use it as the value of :error
      key of the response to lightningd.  In that case, we log
-     the stacktrace of the exception.  See clnplugin-clj/stacktrace
-     and clnplugin-clj/log .
+     the exception.  See clnplugin-clj/exception and clnplugin-clj/log
 
   All the processing is done in a go block.
 
@@ -442,10 +433,10 @@
             (catch Exception e
               (let [msg (format "Error while processing '%s'" req)]
                 (log plugin msg "debug")
-                (log plugin (stacktrace e) "debug")
+                (log plugin (exception e) "debug")
                 {:error {:code -32600
                          :message msg
-                         :stacktrace (stacktrace e)}})))
+                         :exception (exception e)}})))
           resp (merge {:jsonrpc "2.0" :id (:id req)}
                       result-or-error)
           out (:_out @plugin)
