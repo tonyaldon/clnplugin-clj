@@ -4,7 +4,7 @@ import os
 import time
 
 def test_foo(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/foo")
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/rpcmethods")
     l1 = node_factory.get_node(options={"plugin": plugin})
     assert l1.rpc.call("foo-0") == {"bar": "baz"}
     assert l1.rpc.call("foo-1", {"baz-1": "baz-1"}) == {"bar-1": "baz-1"}
