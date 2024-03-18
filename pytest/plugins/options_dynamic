@@ -3,4 +3,4 @@
 plugin_dir=/home/tony/work/projects/clnplugin-clj/pytest/plugins/
 cd $plugin_dir
 # clojure -M foo.clj
-exec clojure -M deprecated_options.clj
+exec clojure -M options_dynamic.clj

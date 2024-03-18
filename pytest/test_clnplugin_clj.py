@@ -42,8 +42,8 @@ def test_init(node_factory):
         l1.rpc.plugin_start(plugin)
 
 
-def test_deprecated_options(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/deprecated_options")
+def test_options_deprecated(node_factory):
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/options_deprecated")
 
     l1 = node_factory.get_node(options={'allow-deprecated-apis': False})
     with pytest.raises(RpcError, match=r"deprecated option"):
@@ -56,8 +56,8 @@ def test_deprecated_options(node_factory):
     assert l2.rpc.call("get-foo_deprecated-value") == {"foo_deprecated": "foo-value"}
 
 
-def test_dynamic_options(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/dynamic_options")
+def test_options_dynamic(node_factory):
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/options_dynamic")
     l1 = node_factory.get_node(options={"plugin": plugin})
     setconfig_resp = l1.rpc.setconfig(config="foo-dynamic", val="foo-value-0")
     assert setconfig_resp["config"]["value_str"] == "foo-value-0"
