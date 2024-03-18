@@ -6,7 +6,13 @@ import time
 def test_foo(node_factory):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/foo")
     l1 = node_factory.get_node(options={"plugin": plugin})
-    assert l1.rpc.call("foo") == {"bar": "baz"}
+    assert l1.rpc.call("foo-0") == {"bar": "baz"}
+    assert l1.rpc.call("foo-1", {"baz-1": "baz-1"}) == {"bar-1": "baz-1"}
+    assert l1.rpc.call("foo-2") == {"bar-2": "baz-2"}
+    # foo-4 must be call before foo-5 because it sets a value in plugin atom
+    # that we want to get with foo-5
+    assert l1.rpc.call("foo-4") == {}
+    assert l1.rpc.call("foo-5") == {"bar-5": "baz-4"}
 
 
 def test_init(node_factory):
@@ -94,6 +100,14 @@ def test_errors(node_factory):
         l1.rpc.call("execution-error")
     assert l1.daemon.is_in_log(r"Error while processing.*method.*execution-error")
     assert l1.daemon.is_in_log(r"java.lang.ArithmeticException: Divide by zero")
+    with pytest.raises(RpcError, match=r"Error while processing.*:method.*non-json-writable-in-result"):
+        l1.rpc.call("non-json-writable-in-result")
+    assert l1.daemon.is_in_log(r"Error while processing.*method.*non-json-writable-in-result")
+    assert l1.daemon.is_in_log(r":cause.*Don't know how to write JSON of class clojure.lang.Agent")
+    assert l1.daemon.is_in_log(r":trace")
+    with pytest.raises(RpcError, match=r"Error while processing.*:method.*non-json-writable-in-error"):
+        l1.rpc.call("non-json-writable-in-error")
+    assert l1.daemon.is_in_log(r"Error while processing.*method.*non-json-writable-in-error")
 
 
 def test_async(node_factory, executor):

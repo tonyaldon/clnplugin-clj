@@ -472,6 +472,98 @@
     (is (= (plugin/notif method params)
            {:jsonrpc "2.0" :method method :params params}))))
 
+(deftest write-test
+  (let [out (new java.io.StringWriter)
+        resp-0 {:jsonrpc "2.0" :id "id-0" :result {:foo "bar"}}
+        resp-1 {:jsonrpc "2.0" :id "id-1" :result ""}
+        resp-2 {:jsonrpc "2.0" :id "id-2" :result nil}
+        resp-3 {:jsonrpc "2.0" :id "id-3" :error {:code -32600 :message "Something wrong happened"}}
+        resp-4 {:jsonrpc "2.0" :method "log" :params {:level "debug" :message "Some message"}}]
+    (plugin/write nil [['req-0 resp-0]] out)
+    (plugin/write nil [['req-0 resp-0] ['req-1 resp-1] ['req-2 resp-2] ['req-3 resp-3]] out)
+    (plugin/write nil [[nil resp-4]] out)
+    (let [outs (str/split (str out) #"\n\n")
+          resps (map #(json/read-str % :key-fn keyword) outs)]
+      (is (= resps (list resp-0
+                         resp-0 resp-1 resp-2 resp-3
+                         resp-4)))))
+  ;; Handle non json writable in :result, :error or :params
+  ;; in responses to requests or in notifications we try to send to lightningd
+  ;;
+  ;; resp with :result
+  (let [out (new java.io.StringWriter)
+        req {:jsonrpc "2.0" :id "some-id" :method "foo" :params {:bar "baz"}}
+        resp {:jsonrpc "2.0" :id "some-id" :result (atom nil)}]
+    (plugin/write nil [[req resp]] out)
+    (let [outs (str/split (str out) #"\n\n")
+          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
+          err (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+      ;; error
+      (is (re-find
+           #"Error while processing.*:method.*foo"
+           (get-in err [:error :message])))
+      (is (re-find
+           #"(?s)#error.*Don't know how to write JSON of class clojure.lang.Atom"
+           (get-in err [:error :exception])))
+      (is (= (get-in err [:error :request])
+             req))
+      (is (re-find
+           #"#object\[clojure.lang.Atom .*\]"
+           (get-in err [:error :response :result])))
+      ;; logs
+      (is (some #(re-find #"Error while processing.*:method.*foo"
+                          (get-in % [:params :message]))
+                resp-and-logs))
+      (is (some #(re-find #"#error" (get-in % [:params :message]))
+                resp-and-logs))
+      (is (some #(re-find #".*Don't know how to write JSON of class clojure.lang.Atom"
+                          (get-in % [:params :message]))
+                resp-and-logs))))
+  ;; resp with :error
+  (let [out (new java.io.StringWriter)
+        req {:jsonrpc "2.0" :id "some-id" :method "foo" :params {:bar "baz"}}
+        resp {:jsonrpc "2.0" :id "some-id" :error (atom nil)}]
+    (plugin/write nil [[req resp]] out)
+    (let [outs (str/split (str out) #"\n\n")
+          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
+          err (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+      ;; error
+      (is (re-find
+           #"Error while processing.*:method.*foo"
+           (get-in err [:error :message])))
+      (is (re-find
+           #"(?s)#error.*Don't know how to write JSON of class clojure.lang.Atom"
+           (get-in err [:error :exception])))
+      (is (= (get-in err [:error :request])
+             req))
+      (is (re-find
+           #"#object\[clojure.lang.Atom .*\]"
+           (get-in err [:error :response :error])))
+      ;; logs
+      (is (some #(re-find #"Error while processing.*:method.*foo"
+                          (get-in % [:params :message]))
+                resp-and-logs))
+      (is (some #(re-find #"#error" (get-in % [:params :message]))
+                resp-and-logs))
+      (is (some #(re-find #".*Don't know how to write JSON of class clojure.lang.Atom"
+                          (get-in % [:params :message]))
+                resp-and-logs))))
+  ;; notifications
+  (let [out (new java.io.StringWriter)
+        notif {:jsonrpc "2.0" :method "some-notif" :params (atom nil)}]
+    (plugin/write nil [[nil notif]] out)
+    (let [outs (str/split (str out) #"\n\n")
+          logs (map #(json/read-str % :key-fn keyword) outs)]
+      ;; logs
+      (is (some #(re-find #"Error while sending notification.*:method.*some-notif"
+                          (get-in % [:params :message]))
+                logs))
+      (is (some #(re-find #"#error" (get-in % [:params :message]))
+                logs))
+      (is (some #(re-find #".*Don't know how to write JSON of class clojure.lang.Atom"
+                          (get-in % [:params :message]))
+                logs)))))
+
 (deftest log-test
   (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
         message "foo"]
@@ -506,18 +598,44 @@
              {:jsonrpc "2.0", :method "log", :params {:level "info", :message "foo-3"}})))))
 
 (deftest process-test
-  (let [plugin (atom {:rpcmethods {:foo {:fn (fn [params plugin] {:bar (:bar params)})}}
+  (let [foo-2 (fn [params plugin] {:bar-2 "baz-2"})
+        plugin (atom {:rpcmethods
+                      {:foo-0 {:fn (fn [params plugin] {:bar "baz"})}
+                       :foo-1 {:fn (fn [params plugin] {:bar-1 (:baz-1 params)})}
+                       :foo-2 {:fn foo-2}
+                       :foo-4 {:fn (fn [params plugin]
+                                     (swap! plugin assoc :bar-4 "baz-4")
+                                     {})}
+                       :foo-5 {:fn (fn [params plugin]
+                                     {:bar-5 (loop [bar-4 nil]
+                                               (or bar-4 (recur (:bar-4 @plugin))))})}}
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
-        req {:jsonrpc "2.0"
-             :id "some-id"
-             :method "foo"
-             :params {:bar "baz"}}]
-    (plugin/process req plugin)
+        req-0 {:jsonrpc "2.0" :id "id-0" :method "foo-0" :params {}}
+        req-1 {:jsonrpc "2.0" :id "id-1" :method "foo-1" :params {:baz-1 "baz-1"}}
+        req-2 {:jsonrpc "2.0" :id "id-2" :method "foo-2" :params {}}
+        req-4 {:jsonrpc "2.0" :id "id-4" :method "foo-4" :params {}}
+        req-5 {:jsonrpc "2.0" :id "id-5" :method "foo-5" :params {}}]
+    (plugin/process req-0 plugin)
+    (Thread/sleep 100) ;; because `plugin/process` calls are asynchronous (in go blocks)
+    (plugin/process req-1 plugin)
+    (Thread/sleep 100)
+    (plugin/process req-2 plugin)
+    (Thread/sleep 100)
+    (plugin/process req-4 plugin)
+    (Thread/sleep 100)
+    (plugin/process req-5 plugin)
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
-           {:jsonrpc "2.0" :id "some-id" :result {:bar "baz"}})))
+    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
+          resps (map #(json/read-str % :key-fn keyword) outs)]
+      (is (= resps
+             '({:jsonrpc "2.0" :id "id-0" :result {:bar "baz"}}
+               {:jsonrpc "2.0" :id "id-1" :result {:bar-1 "baz-1"}}
+               {:jsonrpc "2.0" :id "id-2" :result {:bar-2 "baz-2"}}
+               {:jsonrpc "2.0" :id "id-4" :result {}}
+               {:jsonrpc "2.0" :id "id-5" :result {:bar-5 "baz-4"}})))))
+
   ;; Custom errors raised by user
   (let [plugin (atom {:rpcmethods
                       {:custom-error
@@ -630,6 +748,94 @@
                        :method "log"
                        :params {:level "debug"
                                 :message "java.lang.ArithmeticException: Divide by zero"}})
+                resp-and-logs))))
+
+  ;; Handle non json writable in :result and :error of responses
+  ;; to requests we try to send to lightningd
+  ;;
+  ;; json rpc result with non json writable
+  (let [plugin (atom {:rpcmethods
+                      {:non-json-writable-in-result
+                       {:fn (fn [params plugin]
+                              ;; `swap!` returns new value of plugin
+                              ;; which contains :_out and :_resps (non
+                              ;; json writable) and as it is the last
+                              ;; expression in function body, clnplugin-clj
+                              ;; will try to use it as :result value in
+                              ;; the json response to lightningd.
+                              ;; Fortunately, we catch that Exception
+                              ;; and return an json rpc error to lightningd.
+                              (swap! plugin assoc :bar "baz"))}}
+                      :_out (new java.io.StringWriter)
+                      :_resps (agent nil)})
+        req {:jsonrpc "2.0" :id "some-id" :method "non-json-writable-in-result" :params {}}]
+    (plugin/process req plugin)
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
+    (let [outs (str/split (str (:_out @plugin)) #"\n\n")
+          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
+          err (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+      ;; error
+      (is (re-find
+           #"Error while processing.*:method.*non-json-writable-in-result"
+           (get-in err [:error :message])))
+      (is (re-find
+           #"(?s)#error.*Don't know how to write JSON of class"
+           (get-in err [:error :exception])))
+      (is (= (get-in err [:error :request])
+             req))
+      ;; because `swap!` in non-json-writable-in-result method definition returns new value of plugin atom
+      (let [result (get-in err [:error :response :result])]
+        (is (and (contains? result :rpcmethods)
+                 (contains? result :_out)
+                 (contains? result :_resps))))
+      ;; logs
+      (is (some #(re-find #"Error while processing.*:method.*non-json-writable-in-result"
+                          (get-in % [:params :message]))
+                resp-and-logs))
+      (is (some #(re-find #"#error" (get-in % [:params :message]))
+                resp-and-logs))
+      (is (some #(re-find #".*Don't know how to write JSON of class"
+                          (get-in % [:params :message]))
+                resp-and-logs))))
+  ;; json rpc error with non json writable
+  (let [plugin (atom {:rpcmethods
+                      {:non-json-writable-in-error
+                       {:fn (fn [params plugin]
+                              (throw
+                               ;; atom as :message value is not json writable
+                               (ex-info "non-json-writable-in-error"
+                                        {:error
+                                         {:code -100 :message (atom nil)}})))}}
+                      :_out (new java.io.StringWriter)
+                      :_resps (agent nil)})
+        req {:jsonrpc "2.0" :id "some-id" :method "non-json-writable-in-error" :params {}}]
+    (plugin/process req plugin)
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
+    (let [outs (str/split (str (:_out @plugin)) #"\n\n")
+          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
+          err (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+      ;; error
+      (is (re-find
+           #"Error while processing.*:method.*non-json-writable-in-error"
+           (get-in err [:error :message])))
+      (is (re-find
+           #"(?s)#error.*Don't know how to write JSON of class"
+           (get-in err [:error :exception])))
+      (is (= (get-in err [:error :request])
+             req))
+      (is (re-find
+           #"#object\[clojure.lang.Atom .*\]"
+           (get-in err [:error :response :error :message])))
+      ;; ;; logs
+      (is (some #(re-find #"Error while processing.*:method.*non-json-writable-in-error"
+                          (get-in % [:params :message]))
+                resp-and-logs))
+      (is (some #(re-find #"#error" (get-in % [:params :message]))
+                resp-and-logs))
+      (is (some #(re-find #".*Don't know how to write JSON of class clojure.lang.Atom"
+                          (get-in % [:params :message]))
                 resp-and-logs)))))
 
 (deftest read-test

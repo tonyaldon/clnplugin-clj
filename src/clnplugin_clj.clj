@@ -259,6 +259,81 @@
   [method params]
   {:jsonrpc "2.0" :method method :params params})
 
+(defn json-default-write
+  "Function to handle types which are unknown to data.json.
+
+  If the user gives us an object to write back to lightningd
+  that data.json doesn't handle, we 'stringify' it by wrapping
+  it in a (format \"%s\" ...) call.
+
+  This function is meant to be used as value of the option
+  :default-write-fn of json/write function.
+
+  See clnplugin-clj/process-getmanifest!, clnplugin-clj/process-init!
+  and clnplugin-clj/write"
+  [x out options]
+  (let [sw (new java.io.StringWriter)]
+    (print-method x sw)
+    ;; json/write-string is private to clojure.data.json library!
+    (#'json/write-string (str sw) out options)))
+
+(defn exception
+  "..."
+  [e]
+  (let [sw (new java.io.StringWriter)]
+    (print-method e sw)
+    (str sw)))
+
+(defn- log-
+  "..."
+  [msg out]
+  (doseq [m (str/split-lines msg)]
+    (let [notif (notif "log" {:level "debug" :message m})]
+      (json/write notif out
+                  :escape-slash false
+                  :default-write-fn json-default-write)
+      (. out (append "\n\n")) ;; required by lightningd
+      (. out (flush)))))
+
+(defn write-resp
+  "..."
+  [req resp out]
+  (let [r (try
+            (json/write-str resp :escape-slash false)
+            (catch Exception e
+              (let [msg (format "Error while processing '%s', some objects in the response are not JSON writable" req)
+                    e-str (exception e)
+                    error {:code -32600
+                           :message msg
+                           :exception e-str
+                           :request req
+                           :response resp}
+                    new-resp (assoc (dissoc resp :error :result)
+                                    :error error) ]
+                (log- msg out)
+                (log- e-str out)
+                (json/write-str new-resp
+                                :escape-slash false
+                                :default-write-fn json-default-write))))]
+    (. out (append r))
+    (. out (append "\n\n")) ;; required by lightningd
+    (. out (flush))))
+
+(defn write-notif
+  "..."
+  [notif out]
+  (let [r (try
+            (json/write-str notif :escape-slash false)
+            (catch Exception e
+              (let [msg (format "Error while sending notification '%s', some objects are not JSON writable" notif)]
+                (log- msg out)
+                (log- (exception e) out)
+                nil)))]
+    (when r
+      (. out (append r))
+      (. out (append "\n\n")) ;; required by lightningd
+      (. out (flush)))))
+
 (defn write
   "Write to OUT the responses and notifications in RESPS collection.
 
@@ -280,7 +355,7 @@
       {:jsonrpc \"2.0\"
        :method \"log\"
        :params {:level \"debug\"
-                :message msg}}
+                :message \"Some message\"}}
 
   That function is meant to be an action-fn we send to
   an agent along with RESPS and OUT.  We use an agent to
@@ -294,10 +369,10 @@
 
   See clnplugin-clj/log and clnplugin-clj/process"
   [_ resps out]
-  (doseq [r resps]
-    (json/write r out :escape-slash false)
-    (. out (append "\n\n")) ;; required by lightningd
-    (. out (flush))))
+  (doseq [[req resp] resps]
+    (if req
+      (write-resp req resp out)
+      (write-notif resp out))))
 
 (defn log
   "Send a \"log\" notification to lightningd with level LEVEL.
@@ -320,7 +395,7 @@
   ([plugin message]
    (log plugin message "info"))
   ([plugin message level]
-   (let [notifs (map #(notif "log" {:level level :message %})
+   (let [notifs (map #(vector nil (notif "log" {:level level :message %}))
                      (str/split-lines message))]
      (send (:_resps @plugin) write notifs (:_out @plugin)))
    nil))
@@ -368,7 +443,7 @@
                       result-or-error)
           out (:_out @plugin)
           resps (:_resps @plugin)]
-      (send resps write [resp] out))))
+      (send resps write [[req resp]] out))))
 
 (defn read
   "Read a CLN JSON-RPC request from IN.
