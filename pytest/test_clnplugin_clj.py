@@ -188,6 +188,9 @@ def test_errors(node_factory):
     with pytest.raises(RpcError, match=r"Error while processing.*:symbol-is-not-a-function.*method, .*some-symbol.*value of :fn is not a function"):
         l1.rpc.call("symbol-is-not-a-function")
     assert l1.daemon.is_in_log(r"Error while processing.*:symbol-is-not-a-function.*method, .*some-symbol.*value of :fn is not a function")
+    with pytest.raises(RpcError, match=r"Error while processing ':fn-missing' method, :fn is not defined for that method"):
+        l1.rpc.call("fn-missing")
+    assert l1.daemon.is_in_log(r"Error while processing ':fn-missing' method, :fn is not defined for that method")
     with pytest.raises(RpcError, match=r"Error while processing.*:method.*non-json-writable-in-result"):
         l1.rpc.call("non-json-writable-in-result")
     assert l1.daemon.is_in_log(r"Error while processing.*method.*non-json-writable-in-result")

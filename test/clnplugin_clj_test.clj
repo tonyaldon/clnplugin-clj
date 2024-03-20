@@ -1059,7 +1059,7 @@
       (is (some #(re-find #"Error while processing ':not-a-function' method, '\[:a-vector \"is not a function\"\]' value of :fn is not a function"
                           (get-in % [:params :message]))
                 resp-and-logs))))
-  ;; error because :fn is not a function (we don't symbol as value of :fn)
+  ;; error because :fn is not a function (we don't allow symbol as value of :fn)
   (let [plugin (atom {:rpcmethods
                       {:not-a-function
                        {:fn 'some-symbol}}
@@ -1076,6 +1076,24 @@
       (is (re-find #"Error while processing ':not-a-function' method, 'some-symbol' value of :fn is not a function"
                    (get-in resp [:error :message])))
       (is (some #(re-find #"Error while processing ':not-a-function' method, 'some-symbol' value of :fn is not a function"
+                          (get-in % [:params :message]))
+                resp-and-logs))))
+  ;; error because :fn is missing
+  (let [plugin (atom {:rpcmethods
+                      {:fn-missing {}}
+                      :_out (new java.io.StringWriter)
+                      :_resps (agent nil)})
+        req {:jsonrpc "2.0" :id "some-id" :method "fn-missing" :params {}}]
+    (plugin/process req plugin)
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
+    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
+          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
+          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+      (is (= (get-in resp [:error :code]) -32600))
+      (is (re-find #"Error while processing ':fn-missing' method, :fn is not defined for that method"
+                   (get-in resp [:error :message])))
+      (is (some #(re-find #"Error while processing ':fn-missing' method, :fn is not defined for that method"
                           (get-in % [:params :message]))
                 resp-and-logs))))
 
