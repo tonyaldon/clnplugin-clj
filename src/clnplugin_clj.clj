@@ -56,6 +56,14 @@
         and \"description\""
   [rpcmethods]
   (let [f (fn [[kw-name method]]
+            (let [method-fn (:fn method)]
+              (cond
+                (nil? method-fn)
+                (throw (ex-info (format ":fn is not defined for '%s' RPC method"
+                                        kw-name) {}))
+                (not (fn? method-fn))
+                (throw (ex-info (format "Error in '%s' RPC method definition.  :fn must be a function not '%s' which is an instance of '%s'"
+                                        kw-name method-fn (class method-fn)) {}))))
             {:name (name kw-name)
              :usage (get method :usage "")
              :description (get method :description "")})]
@@ -470,34 +478,22 @@
     (let [method (keyword (:method req))
           method-fn (get-in (:rpcmethods @plugin) [method :fn])
           result-or-error
-          (cond
-            (fn? method-fn)
-            (try
-              {:result (method-fn (:params req) plugin)}
-              (catch clojure.lang.ExceptionInfo e
-                (let [msg (format "Error while processing '%s'" req)
-                      error (merge {:code -32600 :message msg}
-                                   (:error (ex-data e)))]
-                  (log plugin msg "debug")
-                  (log plugin (format "%s" error) "debug")
-                  {:error error}))
-              (catch Exception e
-                (let [msg (format "Error while processing '%s'" req)]
-                  (log plugin msg "debug")
-                  (log plugin (exception e) "debug")
-                  {:error {:code -32600
-                           :message msg
-                           :exception (exception e)}})))
-            (nil? method-fn)
-            (let [msg (format "Error while processing '%s' method, :fn is not defined for that method"
-                              method)]
-              (log plugin msg "debug")
-              {:error {:code -32600 :message msg}})
-            true
-            (let [msg (format "Error while processing '%s' method, '%s' value of :fn is not a function"
-                              method method-fn)]
-              (log plugin msg "debug")
-              {:error {:code -32600 :message msg}}))
+          (try
+            {:result (method-fn (:params req) plugin)}
+            (catch clojure.lang.ExceptionInfo e
+              (let [msg (format "Error while processing '%s'" req)
+                    error (merge {:code -32600 :message msg}
+                                 (:error (ex-data e)))]
+                (log plugin msg "debug")
+                (log plugin (format "%s" error) "debug")
+                {:error error}))
+            (catch Exception e
+              (let [msg (format "Error while processing '%s'" req)]
+                (log plugin msg "debug")
+                (log plugin (exception e) "debug")
+                {:error {:code -32600
+                         :message msg
+                         :exception (exception e)}})))
           resp (merge {:jsonrpc "2.0" :id (:id req)}
                       result-or-error)
           out (:_out @plugin)

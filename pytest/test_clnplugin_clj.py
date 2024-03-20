@@ -15,6 +15,19 @@ def test_rpcmethods(node_factory):
     assert l1.rpc.call("foo-4") == {"bar-4": "baz-3"}
 
 
+def test_getmanifest(node_factory):
+    l1 = node_factory.get_node()
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_fn_not_defined")
+    with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
+        l1.rpc.plugin_start(plugin)
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_fn_not_a_function")
+    with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
+        l1.rpc.plugin_start(plugin)
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_fn_symbol_not_a_function")
+    with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
+        l1.rpc.plugin_start(plugin)
+
+
 def test_init(node_factory):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/init")
     l1 = node_factory.get_node(options={"plugin": plugin,
@@ -182,15 +195,6 @@ def test_errors(node_factory):
         l1.rpc.call("execution-error")
     assert l1.daemon.is_in_log(r"Error while processing.*method.*execution-error")
     assert l1.daemon.is_in_log(r":cause.*Divide by zero")
-    with pytest.raises(RpcError, match=r"Error while processing.*:not-a-function.*method, .*[:a-vector \"is not a function\"].*value of :fn is not a function"):
-        l1.rpc.call("not-a-function")
-    assert l1.daemon.is_in_log(r"Error while processing.*:not-a-function.*method, .*[:a-vector \"is not a function\"].*value of :fn is not a function")
-    with pytest.raises(RpcError, match=r"Error while processing.*:symbol-is-not-a-function.*method, .*some-symbol.*value of :fn is not a function"):
-        l1.rpc.call("symbol-is-not-a-function")
-    assert l1.daemon.is_in_log(r"Error while processing.*:symbol-is-not-a-function.*method, .*some-symbol.*value of :fn is not a function")
-    with pytest.raises(RpcError, match=r"Error while processing ':fn-missing' method, :fn is not defined for that method"):
-        l1.rpc.call("fn-missing")
-    assert l1.daemon.is_in_log(r"Error while processing ':fn-missing' method, :fn is not defined for that method")
     with pytest.raises(RpcError, match=r"Error while processing.*:method.*non-json-writable-in-result"):
         l1.rpc.call("non-json-writable-in-result")
     assert l1.daemon.is_in_log(r"Error while processing.*method.*non-json-writable-in-result")

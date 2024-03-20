@@ -1,4 +1,4 @@
-(ns init-disable-check-opt-not-a-function
+(ns init-disable-check-opt-execution-error
   (:require [clnplugin-clj :as plugin]))
 
 (def plugin (atom {:options

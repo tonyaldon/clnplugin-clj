@@ -105,21 +105,36 @@
   (is (= (plugin/gm-rpcmethods
           {:foo {:usage "usage"
                  :description "description"
-                 :fn 'fn-foo}})
+                 :fn (fn [params plugin])}})
          [{:name "foo" :usage "usage" :description "description"}]))
   (is (= (plugin/gm-rpcmethods
-          {:foo-1 {:fn 'fn-foo-1}
+          {:foo-1 {:fn (fn [params plugin])}
            :foo-2 {:usage "usage-2"
-                   :fn 'fn-foo-2}
+                   :fn (fn [params plugin])}
            :foo-3 {:description "description-3"
-                   :fn 'fn-foo-3}
+                   :fn (fn [params plugin])}
            :foo-4 {:usage "usage-4"
                    :description "description-4"
-                   :fn 'fn-foo-4}})
+                   :fn (fn [params plugin])}})
          [{:name "foo-1" :usage "" :description ""}
           {:name "foo-2" :usage "usage-2" :description ""}
           {:name "foo-3" :usage "" :description "description-3"}
-          {:name "foo-4" :usage "usage-4" :description "description-4"}])))
+          {:name "foo-4" :usage "usage-4" :description "description-4"}]))
+  ;; :fn is not defined
+  (is (thrown-with-msg?
+       Throwable
+       #":fn is not defined for ':foo' RPC method"
+       (plugin/gm-rpcmethods {:foo {}})))
+  ;; error because :fn is not a function
+  (is (thrown-with-msg?
+       Throwable
+       #"Error in ':foo' RPC method definition.  :fn must be a function not '\[:a-vector \"is not a function\"\]' which is an instance of 'class clojure.lang.PersistentVector'"
+       (plugin/gm-rpcmethods {:foo {:fn [:a-vector "is not a function"]}})))
+  ;; error because :fn is not a function (we don't allow symbol as value of :fn)
+  (is (thrown-with-msg?
+       Throwable
+       #"Error in ':foo' RPC method definition.  :fn must be a function not 'some-symbol' which is an instance of 'class clojure.lang.Symbol'"
+       (plugin/gm-rpcmethods {:foo {:fn 'some-symbol}}))))
 
 (deftest gm-resp-test
   ;; defaults
@@ -156,14 +171,14 @@
                                 :foo-4 {:type "string"
                                         :description "foo-4-description"
                                         :multi true}}
-                      :rpcmethods {:foo-1 {:fn 'fn-foo-1}
+                      :rpcmethods {:foo-1 {:fn (fn [param plugin])}
                                    :foo-2 {:usage "usage-2"
-                                           :fn 'fn-foo-2}
+                                           :fn (fn [param plugin])}
                                    :foo-3 {:description "description-3"
-                                           :fn 'fn-foo-3}
+                                           :fn (fn [param plugin])}
                                    :foo-4 {:usage "usage-4"
                                            :description "description-4"
-                                           :fn 'fn-foo-4}}
+                                           :fn (fn [param plugin])}}
                       :dynamic true})
                req {:id 16}]
            (plugin/gm-resp req plugin))
@@ -189,15 +204,15 @@
                                 {:name "foo-4" :usage "usage-4" :description "description-4"}]
                    :dynamic true}
           }))
-  ;; raise error due to wrong options
-  (is (thrown? Throwable
-               (let [plugin (atom {:options {:foo {:type "bool"
-                                                   :description "foo-description"
-                                                   :multi true}}
-                                   :rpcmethods {}
-                                   :dynamic true})
-                     req {:id 16}]
-                 (plugin/gm-resp plugin req)))))
+  ;; error because :fn is not a function for foo rpcmethod
+  (is (thrown-with-msg?
+       Throwable
+       #"Error in ':foo' RPC method definition.  :fn must be a function not '\[:a-vector \"is not a function\"\]' which is an instance of 'class clojure.lang.PersistentVector'"
+       (let [plugin (atom {:options {}
+                           :rpcmethods {:foo {:fn [:a-vector "is not a function"]}}
+                           :dynamic true})
+             req {:id 16}]
+         (plugin/gm-resp req plugin)))))
 
 (deftest set-defaults!-test
   (is (= (let [plugin (atom nil)]
@@ -261,7 +276,7 @@
 
 (deftest process-getmanifest!-test
   (let [plugin (atom {:options {:opt 'opt}
-                      :rpcmethods {:foo 'foo}
+                      :rpcmethods {:foo {:fn (fn [params plugin])}}
                       :dynamic true
                       :_out (new java.io.StringWriter)})
         req {:jsonrpc "2.0" :id 0 :method "getmanifest" :params {:allow-deprecated-apis false}}]
@@ -1039,62 +1054,6 @@
                        :method "log"
                        :params {:level "debug"
                                 :message " :cause \"Divide by zero\""}})
-                resp-and-logs))))
-  ;; error because :fn is not a function
-  (let [plugin (atom {:rpcmethods
-                      {:not-a-function
-                       {:fn [:a-vector "is not a function"]}}
-                      :_out (new java.io.StringWriter)
-                      :_resps (agent nil)})
-        req {:jsonrpc "2.0" :id "some-id" :method "not-a-function" :params {}}]
-    (plugin/process req plugin)
-    (await (:_resps @plugin))
-    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
-          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
-          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
-      (is (= (get-in resp [:error :code]) -32600))
-      (is (re-find #"Error while processing ':not-a-function' method, '\[:a-vector \"is not a function\"\]' value of :fn is not a function"
-                   (get-in resp [:error :message])))
-      (is (some #(re-find #"Error while processing ':not-a-function' method, '\[:a-vector \"is not a function\"\]' value of :fn is not a function"
-                          (get-in % [:params :message]))
-                resp-and-logs))))
-  ;; error because :fn is not a function (we don't allow symbol as value of :fn)
-  (let [plugin (atom {:rpcmethods
-                      {:not-a-function
-                       {:fn 'some-symbol}}
-                      :_out (new java.io.StringWriter)
-                      :_resps (agent nil)})
-        req {:jsonrpc "2.0" :id "some-id" :method "not-a-function" :params {}}]
-    (plugin/process req plugin)
-    (await (:_resps @plugin))
-    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
-          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
-          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
-      (is (= (get-in resp [:error :code]) -32600))
-      (is (re-find #"Error while processing ':not-a-function' method, 'some-symbol' value of :fn is not a function"
-                   (get-in resp [:error :message])))
-      (is (some #(re-find #"Error while processing ':not-a-function' method, 'some-symbol' value of :fn is not a function"
-                          (get-in % [:params :message]))
-                resp-and-logs))))
-  ;; error because :fn is missing
-  (let [plugin (atom {:rpcmethods
-                      {:fn-missing {}}
-                      :_out (new java.io.StringWriter)
-                      :_resps (agent nil)})
-        req {:jsonrpc "2.0" :id "some-id" :method "fn-missing" :params {}}]
-    (plugin/process req plugin)
-    (await (:_resps @plugin))
-    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
-          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
-          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
-      (is (= (get-in resp [:error :code]) -32600))
-      (is (re-find #"Error while processing ':fn-missing' method, :fn is not defined for that method"
-                   (get-in resp [:error :message])))
-      (is (some #(re-find #"Error while processing ':fn-missing' method, :fn is not defined for that method"
-                          (get-in % [:params :message]))
                 resp-and-logs))))
 
   ;; Handle non json writable in :result and :error of responses
