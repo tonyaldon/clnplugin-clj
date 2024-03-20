@@ -218,7 +218,7 @@
        (swap! plugin assoc-in [:options kw-opt :value] value)
        (if at-init?
          (throw (ex-info msg {:disable msg}))
-         (throw (ex-info msg {:error {:code -32600 :message msg}})))))))
+         (throw (ex-info msg {:error {:code -32602 :message msg}})))))))
 
 
 (defn set-options-at-init!
@@ -358,7 +358,7 @@
             (catch Exception e
               (let [msg (format "Error while processing '%s', some objects in the response are not JSON writable" req)
                     e-str (exception e)
-                    error {:code -32600
+                    error {:code -32603
                            :message msg
                            :exception e-str
                            :request req
@@ -482,7 +482,7 @@
             {:result (method-fn (:params req) plugin)}
             (catch clojure.lang.ExceptionInfo e
               (let [msg (format "Error while processing '%s'" req)
-                    error (merge {:code -32600 :message msg}
+                    error (merge {:code -32603 :message msg}
                                  (:error (ex-data e)))]
                 (log plugin msg "debug")
                 (log plugin (format "%s" error) "debug")
@@ -491,7 +491,7 @@
               (let [msg (format "Error while processing '%s'" req)]
                 (log plugin msg "debug")
                 (log plugin (exception e) "debug")
-                {:error {:code -32600
+                {:error {:code -32603
                          :message msg
                          :exception (exception e)}})))
           resp (merge {:jsonrpc "2.0" :id (:id req)}
@@ -515,7 +515,7 @@
                         (catch Exception e
                           (throw
                            (let [msg (format "Invalid token in json input: '%s'" req-acc)]
-                             (ex-info msg {:error {:code -32600 :message msg}})))))
+                             (ex-info msg {:error {:code -32700 :message msg}})))))
         true (let [next-line (read-line)]
                (recur (str req-acc line) next-line))))))
 

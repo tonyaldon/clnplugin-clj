@@ -326,7 +326,7 @@
       (plugin/set-option! [:foo "foo-value"] plugin))
     (catch Exception e
       (is (= (ex-data e)
-             {:error {:code -32600
+             {:error {:code -32602
                       :message "Cannot set ':foo' option which has not been declared to lightningd"}}))))
   (is (= (let [plugin (atom {:options {:foo nil}})]
            (plugin/set-option! [:foo "foo-value"] plugin :at-init)
@@ -342,7 +342,7 @@
       (plugin/set-option! [:foo "foo-value"] plugin))
     (catch Exception e
       (is (ex-data e)
-          {:error {:code -32600
+          {:error {:code -32602
                    :message "Cannot set ':foo' option which is not dynamic.  Add ':dynamic true' to its declaration."}})))
   (is (= (let [plugin (atom {:options {:foo nil
                                        :bar {:default "bar-default"}}})]
@@ -381,7 +381,7 @@
       (plugin/set-option! [:foo "foo-value"] plugin))
     (catch Exception e
       (is (= (ex-data e)
-             {:error {:code -32600 :message "Wrong option 'foo'"}}))))
+             {:error {:code -32602 :message "Wrong option 'foo'"}}))))
   ;; :check-opt is not a function
   (try
     (let [plugin (atom {:options
@@ -408,7 +408,7 @@
       (plugin/set-option! [:foo "foo-value"] plugin))
     (catch Exception e
       (is (= (ex-data e)
-             {:error {:code -32600
+             {:error {:code -32602
                       :message ":check-opt of ':foo' option must be a function not '[:a-vector \"is not a function\"]' which is an instance of 'class clojure.lang.PersistentVector'"}}))))
   ;; :check-opt throws an error at execution time
   (try
@@ -718,7 +718,7 @@
       (plugin/setconfig! params plugin))
     (catch Exception e
       (is (= (ex-data e)
-             {:error {:code -32600
+             {:error {:code -32602
                       :message "Cannot set ':foo' option which is not dynamic.  Add ':dynamic true' to its declaration."}}))))
   ;; :check-opt
   (let [plugin (atom {:options
@@ -735,7 +735,7 @@
       (plugin/setconfig! params-wrong plugin)
       (catch Exception e
         (is (= (ex-data e)
-               {:error {:code -32600 :message "'foo' option must be positive"}})))))
+               {:error {:code -32602 :message "'foo' option must be positive"}})))))
   (try
     (let [plugin (atom {:options
                         {:foo
@@ -745,7 +745,7 @@
       (plugin/setconfig! params plugin))
     (catch Exception e
       (is (= (ex-data e)
-             {:error {:code -32600
+             {:error {:code -32602
                       :message ":check-opt of ':foo' option must be a function not '[:a-vector \"is not a function\"]' which is an instance of 'class clojure.lang.PersistentVector'"}}))))
 
   (try
@@ -971,7 +971,7 @@
                 resp-and-logs))))
 
   ;; missing :code key in the error thrown by :fn
-  ;; so it is set to -326000
+  ;; so it is set to -32603
   (let [plugin (atom {:rpcmethods
                       {:custom-error
                        {:fn (fn [params plugin]
@@ -991,7 +991,7 @@
              {:jsonrpc "2.0"
               :id "some-id"
               :error
-              {:code -32600 :message "custom-error"}}))))
+              {:code -32603 :message "custom-error"}}))))
   ;; missing :message key in the error thrown by :fn
   (let [plugin (atom {:rpcmethods
                       {:custom-error
@@ -1025,7 +1025,7 @@
     (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
           resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
           resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
-      (is (= (get-in resp [:error :code]) -32600))
+      (is (= (get-in resp [:error :code]) -32603))
       (is (re-find #"Error while processing.*method.*custom-error"
                    (get-in resp [:error :message])))))
   ;; Execution errors
@@ -1041,7 +1041,7 @@
     (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
           resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
           resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
-      (is (= (get-in resp [:error :code]) -32600))
+      (is (= (get-in resp [:error :code]) -32603))
       (is (re-find #"Error while processing.*method.*execution-error"
                    (get-in resp [:error :message])))
       (is (re-find
@@ -1170,9 +1170,10 @@
          (with-open [in (-> (java.io.StringReader. req-str) clojure.lang.LineNumberingPushbackReader.)]
            (plugin/read in)))
        nil))
-  (is (thrown-with-msg?
-       Throwable
-       #"Invalid token in json input: 'foo'"
-       (let [req-str "foo\n\n"]
-         (with-open [in (-> (java.io.StringReader. req-str) clojure.lang.LineNumberingPushbackReader.)]
-           (plugin/read in))))))
+  (try
+    (let [req-str "foo\n\n"]
+      (with-open [in (-> (java.io.StringReader. req-str) clojure.lang.LineNumberingPushbackReader.)]
+        (plugin/read in)))
+    (catch clojure.lang.ExceptionInfo e
+      (is (= (ex-data e)
+             {:error {:code -32700 :message "Invalid token in json input: 'foo'"}})))))
