@@ -291,6 +291,21 @@
          (:getmanifest @plugin)
          {:allow-deprecated-apis false}))))
 
+(deftest get-option-test
+  (let [plugin (atom {:options
+                      {:foo-1 nil
+                       :foo-2 {:type "string"
+                               :description "foo-description"}
+                       :foo-3 {:default 1}
+                       :foo-4 {:value 2}
+                       :foo-5 {:default 1
+                               :value 2}}})]
+    (is (= (plugin/get-option plugin :foo-1) nil))
+    (is (= (plugin/get-option plugin :foo-2) nil))
+    (is (= (plugin/get-option plugin :foo-3) 1))
+    (is (= (plugin/get-option plugin :foo-4) 2))
+    (is (= (plugin/get-option plugin :foo-5) 2))))
+
 (deftest convert-opt-value-test
   (is (= (plugin/convert-opt-value 12 nil) 12))
   (is (= (plugin/convert-opt-value 12 "int") 12))

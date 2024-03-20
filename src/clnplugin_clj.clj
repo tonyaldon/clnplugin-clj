@@ -138,6 +138,12 @@
     (print-method e sw)
     (str sw)))
 
+(defn get-option
+  "..."
+  [plugin kw-opt]
+  (or (get-in @plugin [:options kw-opt :value])
+      (get-in @plugin [:options kw-opt :default])))
+
 (defn convert-opt-value
   "..."
   [value type]
