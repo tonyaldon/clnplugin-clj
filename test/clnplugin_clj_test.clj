@@ -276,17 +276,43 @@
          (:getmanifest @plugin)
          {:allow-deprecated-apis false}))))
 
+(deftest convert-opt-value-test
+  (is (= (plugin/convert-opt-value 12 nil) 12))
+  (is (= (plugin/convert-opt-value 12 "int") 12))
+  (is (= (plugin/convert-opt-value -12 nil) -12))
+  (is (= (plugin/convert-opt-value -12 "int") -12))
+  (is (= (plugin/convert-opt-value true nil) true))
+  (is (= (plugin/convert-opt-value true "bool") true))
+  (is (= (plugin/convert-opt-value false nil) false))
+  (is (= (plugin/convert-opt-value false "bool") false))
+  (is (= (plugin/convert-opt-value "foo" nil) "foo"))
+  (is (= (plugin/convert-opt-value "foo" "string") "foo"))
+  (is (= (plugin/convert-opt-value "12" "string") "12"))
+  (is (= (plugin/convert-opt-value "12" "int") 12))
+  (is (= (plugin/convert-opt-value "-12" "int") -12))
+  (is (= (plugin/convert-opt-value "true" "bool") true))
+  (is (= (plugin/convert-opt-value "false" "bool") false))
+  ;; when `setconfig` has just the config argument set,
+  ;; this indicate to turn on the flag
+  ;; There's no way to turn off a flag dynamically as of CLN 24.02
+  (is (= (plugin/convert-opt-value nil "flag") true))
+  (is (= (plugin/convert-opt-value "true" "flag") true))
+  (is (= (plugin/convert-opt-value "false" "flag") false)))
+
 (deftest set-option!-test
-  (is (thrown-with-msg?
-       Throwable
-       #"Cannot set ':foo' option which has not been declared to lightningd"
-       (let [plugin (atom {:options {}})]
-         (plugin/set-option! [:foo "foo-value"] plugin :at-init))))
-  (is (thrown-with-msg?
-       Throwable
-       #"Cannot set ':foo' option which has not been declared to lightningd"
-       (let [plugin (atom {:options {}})]
-         (plugin/set-option! [:foo "foo-value"] plugin))))
+  (try
+    (let [plugin (atom {:options {}})]
+      (plugin/set-option! [:foo "foo-value"] plugin :at-init))
+    (catch Exception e
+      (is (= (ex-data e)
+             {:disable "Cannot set ':foo' option which has not been declared to lightningd"}))))
+  (try
+    (let [plugin (atom {:options {}})]
+      (plugin/set-option! [:foo "foo-value"] plugin))
+    (catch Exception e
+      (is (= (ex-data e)
+             {:error {:code -32600
+                      :message "Cannot set ':foo' option which has not been declared to lightningd"}}))))
   (is (= (let [plugin (atom {:options {:foo nil}})]
            (plugin/set-option! [:foo "foo-value"] plugin :at-init)
            @plugin)
@@ -296,11 +322,13 @@
            @plugin)
          {:options {:foo {:dynamic true
                           :value "foo-value"}}}))
-  (is (thrown-with-msg?
-       Throwable
-       #"Cannot set ':foo' option which is not dynamic.  Add ':dynamic true' to its declaration."
-       (let [plugin (atom {:options {:foo nil}})]
-         (plugin/set-option! [:foo "foo-value"] plugin))))
+  (try
+    (let [plugin (atom {:options {:foo nil}})]
+      (plugin/set-option! [:foo "foo-value"] plugin))
+    (catch Exception e
+      (is (ex-data e)
+          {:error {:code -32600
+                   :message "Cannot set ':foo' option which is not dynamic.  Add ':dynamic true' to its declaration."}})))
   (is (= (let [plugin (atom {:options {:foo nil
                                        :bar {:default "bar-default"}}})]
            (plugin/set-option! [:bar "bar-value"] plugin :at-init)
@@ -316,7 +344,96 @@
          {:options {:foo nil
                     :bar {:default "bar-default"
                           :dynamic true
-                          :value "bar-value"}}})))
+                          :value "bar-value"}}}))
+  ;; :check-opt throws an error so the plugin will be disable at init round
+  (try
+    (let [plugin (atom {:options
+                        {:foo
+                         {:check-opt
+                          (fn [value plugin]
+                            (throw (ex-info "Wrong option 'foo'" {})))}}})]
+      (plugin/set-option! [:foo "foo-value"] plugin :at-init))
+    (catch Exception e
+      (is (= (ex-data e) {:disable "Wrong option 'foo'"}))))
+  ;; :check-opt throws an error so the option won't be set by lightningd (dynamic option)
+  (try
+    (let [plugin (atom {:options
+                        {:foo
+                         {:dynamic true
+                          :check-opt
+                          (fn [value plugin]
+                            (throw (ex-info "Wrong option 'foo'" {})))}}})]
+      (plugin/set-option! [:foo "foo-value"] plugin))
+    (catch Exception e
+      (is (= (ex-data e)
+             {:error {:code -32600 :message "Wrong option 'foo'"}}))))
+  ;; :check-opt is not a function
+  (try
+    (let [plugin (atom {:options
+                        {:foo
+                         {:check-opt [:a-vector "is not a function"]}}})]
+      (plugin/set-option! [:foo "foo-value"] plugin :at-init))
+    (catch Exception e
+      (is (= (ex-data e)
+             {:disable ":check-opt of ':foo' option must be a function not '[:a-vector \"is not a function\"]' which is an instance of 'class clojure.lang.PersistentVector'"}))))
+  (try
+    (let [plugin (atom {:options
+                        {:foo
+                         {:check-opt 'some-symbol}}})]
+      (plugin/set-option! [:foo "foo-value"] plugin :at-init))
+    (catch Exception e
+      (is (= (ex-data e)
+             {:disable ":check-opt of ':foo' option must be a function not 'some-symbol' which is an instance of 'class clojure.lang.Symbol'"}))))
+  ;; :check-opt is not a function (dynamic option)
+  (try
+    (let [plugin (atom {:options
+                        {:foo
+                         {:dynamic true
+                          :check-opt [:a-vector "is not a function"]}}})]
+      (plugin/set-option! [:foo "foo-value"] plugin))
+    (catch Exception e
+      (is (= (ex-data e)
+             {:error {:code -32600
+                      :message ":check-opt of ':foo' option must be a function not '[:a-vector \"is not a function\"]' which is an instance of 'class clojure.lang.PersistentVector'"}}))))
+  ;; :check-opt throws an error at execution time
+  (try
+    (let [plugin (atom {:options
+                        {:foo
+                         {:check-opt (fn [value plugin] (/ 1 0))}}})]
+      (plugin/set-option! [:foo "foo-value"] plugin :at-init))
+    (catch Exception e
+      (is (re-find
+           #"(?s):check-opt of ':foo' option thrown the following exception when called with 'foo-value' value:.*#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
+           (:disable (ex-data e))))))
+  ;; :check-opt throws an error at execution time (dynamic option)
+  (try
+    (let [plugin (atom {:options
+                        {:foo
+                         {:dynamic true
+                          :check-opt (fn [value plugin] (/ 1 0))}}})]
+      (plugin/set-option! [:foo "foo-value"] plugin))
+    (catch Exception e
+      (is (re-find
+           #"(?s):check-opt of ':foo' option thrown the following exception when called with 'foo-value' value:.*#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
+           (get-in (ex-data e) [:error :message])))))
+  ;; side effect with :check-opt while setting foo option
+  (let [plugin (atom {:options
+                      {:foo
+                       {:check-opt
+                        (fn [value plugin]
+                          (swap! plugin assoc :bar "baz"))}}})]
+    (plugin/set-option! [:foo "foo-value"] plugin :at-init)
+    (is (= (:bar @plugin) "baz"))
+    (is (= (get-in @plugin [:options :foo :value]) "foo-value")))
+  (let [plugin (atom {:options
+                      {:foo
+                       {:dynamic true
+                        :check-opt
+                        (fn [value plugin]
+                          (swap! plugin assoc :bar "baz"))}}})]
+    (plugin/set-option! [:foo "foo-value"] plugin)
+    (is (= (:bar @plugin) "baz"))
+    (is (= (get-in @plugin [:options :foo :value]) "foo-value"))))
 
 (deftest set-options-at-init!-test
   (is (= (let [plugin (atom {:options {:foo nil
@@ -346,9 +463,38 @@
                     :bar {:default "bar-default"
                           :value "bar-value"}
                     :baz {:dynamic true
-                          :value "baz-value"}}})))
+                          :value "baz-value"}}}))
+  (try
+    (let [plugin (atom {:options {:foo
+                                  {:check-opt
+                                   (fn [value plugin]
+                                     (throw (ex-info "Wrong option 'foo'" {})))}
+                                  :bar {:default "bar-default"}}})]
+      (plugin/set-options-at-init! {:foo "foo-value" :bar "bar-value"} plugin))
+    (catch clojure.lang.ExceptionInfo e
+      (is (= (ex-data e) {:disable "Wrong option 'foo'"})))))
 
 (deftest process-init!-test
+  (let [plugin (atom {:options {} :rpcmethods {} :dynamic true
+                      :getmanifest {:allow-deprecated-apis false}
+                      :_out (new java.io.StringWriter)})
+        req {:jsonrpc "2.0" :id 0 :method "init"
+             :params {:options {}
+                      :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                      :rpc-file "lightning-rpc"}}}]
+    (plugin/process-init! req plugin)
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+           {:jsonrpc "2.0" :id 0 :result {}}))
+    (is (= (dissoc @plugin :_out)
+           {:options {}
+            :rpcmethods {}
+            :dynamic true
+            :getmanifest {:allow-deprecated-apis false}
+            :init {:options {}
+                   :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                   :rpc-file "lightning-rpc"}}
+            :socket-file "/tmp/l1-regtest/regtest/lightning-rpc"})))
+  ;; :init-fn function is ok
   (let [plugin (atom {:options {:foo nil
                                 :bar {:default "bar-default"}
                                 :baz {:dynamic true}}
@@ -380,25 +526,85 @@
                                    :rpc-file "lightning-rpc"}}
             :socket-file "/tmp/l1-regtest/regtest/lightning-rpc"
             :set-by-init-fn "init-fn"})))
-  (let [plugin (atom {:options {} :rpcmethods {} :dynamic true
+  ;; disable plugin because of :check-opt in plugin options
+  ;;
+  ;; :check-opt disable the plugin
+  (let [plugin (atom {:options
+                      {:foo
+                       {:check-opt
+                        (fn [value plugin]
+                          (throw (ex-info "Wrong option 'foo'" {})))}}
+                      :rpcmethods {}
+                      :dynamic true
                       :getmanifest {:allow-deprecated-apis false}
                       :_out (new java.io.StringWriter)})
         req {:jsonrpc "2.0" :id 0 :method "init"
-             :params {:options {}
+             :params {:options {:foo "foo-value"}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
     (plugin/process-init! req plugin)
     (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
-           {:jsonrpc "2.0" :id 0 :result {}}))
-    (is (= (dissoc @plugin :_out)
-           {:options {}
-            :rpcmethods {}
-            :dynamic true
-            :getmanifest {:allow-deprecated-apis false}
-            :init {:options {}
-                   :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
-                                   :rpc-file "lightning-rpc"}}
-            :socket-file "/tmp/l1-regtest/regtest/lightning-rpc"})))
+           {:jsonrpc "2.0" :id 0
+            :result {:disable "Wrong option 'foo'"}})))
+  ;; :check-opt is called for each option before we try to run
+  ;; :init-fn.  So, a wrong option will disable the plugin before
+  ;; we try to run :init-fn
+  (let [plugin (atom {:options
+                      {:foo
+                       {:check-opt
+                        (fn [value plugin]
+                          (throw (ex-info "Wrong option 'foo'" {})))}}
+                      :rpcmethods {}
+                      :dynamic true
+                      :init-fn (fn [req plugin] (/ 1 0))
+                      :getmanifest {:allow-deprecated-apis false}
+                      :_out (new java.io.StringWriter)})
+        req {:jsonrpc "2.0" :id 0 :method "init"
+             :params {:options {:foo "foo-value"}
+                      :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                      :rpc-file "lightning-rpc"}}}]
+    (plugin/process-init! req plugin)
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+           {:jsonrpc "2.0" :id 0
+            :result {:disable "Wrong option 'foo'"}})))
+
+  ;; :check-opt is not a function
+  (let [plugin (atom {:options
+                      {:foo
+                       {:check-opt [:a-vector "is not a function"]}}
+                      :rpcmethods {}
+                      :dynamic true
+                      :getmanifest {:allow-deprecated-apis false}
+                      :_out (new java.io.StringWriter)})
+        req {:jsonrpc "2.0" :id 0 :method "init"
+             :params {:options {:foo "foo-value"}
+                      :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                      :rpc-file "lightning-rpc"}}}]
+    (plugin/process-init! req plugin)
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+           {:jsonrpc "2.0" :id 0
+            :result {:disable ":check-opt of ':foo' option must be a function not '[:a-vector \"is not a function\"]' which is an instance of 'class clojure.lang.PersistentVector'"}})))
+
+  ;; :check-opt throws an error at execution time
+  (let [plugin (atom {:options
+                      {:foo
+                       {:check-opt (fn [value plugin] (/ 1 0))}}
+                      :rpcmethods {}
+                      :dynamic true
+                      :getmanifest {:allow-deprecated-apis false}
+                      :_out (new java.io.StringWriter)})
+        req {:jsonrpc "2.0" :id 0 :method "init"
+             :params {:options {:foo "foo-value"}
+                      :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
+                                      :rpc-file "lightning-rpc"}}}]
+    (plugin/process-init! req plugin)
+    (is (re-find
+         #"(?s):check-opt of ':foo' option thrown the following exception when called with 'foo-value' value:.*#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
+         (get-in (json/read-str (str (:_out @plugin)) :key-fn keyword)
+                 [:result :disable]))))
+  ;; disable plugin because of :init-fn plugin key
+  ;;
+  ;; :init-fn not a function
   (let [plugin (atom {:options {}
                       :rpcmethods {}
                       :dynamic true
@@ -413,6 +619,7 @@
     (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
            {:jsonrpc "2.0" :id 0
             :result {:disable ":init-fn must be a function not 'not-a-function' which is an instance of 'class clojure.lang.Symbol'"}})))
+  ;; :init-fn throws an error
   (let [plugin (atom {:options {}
                       :rpcmethods {}
                       :dynamic true
@@ -428,11 +635,13 @@
       (is (re-find
            #"(?s)#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
            (get-in resp [:result :disable])))))
+  ;; :init-fn disable the plugin
   (let [plugin (atom {:options {}
                       :rpcmethods {}
                       :dynamic true
                       :getmanifest {:allow-deprecated-apis false}
-                      :init-fn (fn [req plugin] {:disable "disabled by user"})
+                      :init-fn (fn [req plugin]
+                                 (throw (ex-info "disabled by user" {})))
                       :_out (new java.io.StringWriter)})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {}
@@ -444,18 +653,98 @@
              "disabled by user")))))
 
 (deftest setconfig!-test
+  ;; Note that lightningd send `setconfig` requests
+  ;; to the plugin with `val` in `params` being a string
+  ;; even if the option is defined by the plugin as being
+  ;; of type "int" or "bool".  If the option is of type
+  ;; "flag", `val` is not present in the request and this
+  ;; means that we turn on the flag option.  There is no
+  ;; way to turn off a flag option dynamically as of CLN 24.02.
   (let [plugin (atom {:options {:foo {:dynamic true}}})
         params {:config "foo", :val "foo-value"}
         resp (plugin/setconfig! params plugin)]
     (is (= resp {}))
     (is (= @plugin {:options {:foo {:value "foo-value"
                                     :dynamic true}}})))
-  ;; 'foo' option is not dynamic
-  (is (thrown?
-       Throwable
-       (let [plugin (atom {:options {:foo nil}})
-             params {:config "foo", :val "foo-value"}]
-         (plugin/setconfig! params plugin)))))
+  (let [plugin (atom {:options {:foo {:type "int"
+                                      :dynamic true}}})
+        params-0 {:config "foo", :val "12"}
+        params-1 {:config "foo", :val "-12"}]
+    (is (= (plugin/setconfig! params-0 plugin) {}))
+    (is (= @plugin {:options {:foo {:value 12
+                                    :type "int"
+                                    :dynamic true}}}))
+    (is (= (plugin/setconfig! params-1 plugin) {}))
+    (is (= @plugin {:options {:foo {:value -12
+                                    :type "int"
+                                    :dynamic true}}})))
+  (let [plugin (atom {:options {:foo {:type "bool"
+                                      :dynamic true}}})
+        params-0 {:config "foo", :val "true"}
+        params-1 {:config "foo", :val "false"}]
+    (is (= (plugin/setconfig! params-0 plugin) {}))
+    (is (= @plugin {:options {:foo {:value true
+                                    :type "bool"
+                                    :dynamic true}}}))
+    (is (= (plugin/setconfig! params-1 plugin) {}))
+    (is (= @plugin {:options {:foo {:value false
+                                    :type "bool"
+                                    :dynamic true}}})))
+  (let [plugin (atom {:options {:foo {:type "flag"
+                                      :dynamic true}}})
+        params {:config "foo"}]
+    (is (= (plugin/setconfig! params plugin) {}))
+    (is (= @plugin {:options {:foo {:value true
+                                    :type "flag"
+                                    :dynamic true}}})))
+  (try
+    (let [plugin (atom {:options {:foo nil}})
+          params {:config "foo", :val "foo-value"}]
+      (plugin/setconfig! params plugin))
+    (catch Exception e
+      (is (= (ex-data e)
+             {:error {:code -32600
+                      :message "Cannot set ':foo' option which is not dynamic.  Add ':dynamic true' to its declaration."}}))))
+  ;; :check-opt
+  (let [plugin (atom {:options
+                      {:foo
+                       {:dynamic true
+                        :check-opt (fn [value plugin]
+                                     (when-not (and (number? value) (pos? value))
+                                       (throw (ex-info "'foo' option must be positive" {}))))}}})
+        params-ok {:config "foo", :val 12}
+        params-wrong {:config "foo", :val -1}]
+    (is (= (plugin/setconfig! params-ok plugin) {}))
+    (is (= (get-in @plugin [:options :foo :value]) 12))
+    (try
+      (plugin/setconfig! params-wrong plugin)
+      (catch Exception e
+        (is (= (ex-data e)
+               {:error {:code -32600 :message "'foo' option must be positive"}})))))
+  (try
+    (let [plugin (atom {:options
+                        {:foo
+                         {:dynamic true
+                          :check-opt [:a-vector "is not a function"]}}})
+          params {:config "foo", :val "foo-value"}]
+      (plugin/setconfig! params plugin))
+    (catch Exception e
+      (is (= (ex-data e)
+             {:error {:code -32600
+                      :message ":check-opt of ':foo' option must be a function not '[:a-vector \"is not a function\"]' which is an instance of 'class clojure.lang.PersistentVector'"}}))))
+
+  (try
+    (let [plugin (atom {:options
+                        {:foo
+                         {:dynamic true
+                          :check-opt (fn [value plugin] (/ 1 0))}}})
+          params {:config "foo", :val "foo-value"}]
+      (plugin/setconfig! params plugin))
+    (catch Exception e
+      ;; (prn e)
+      (is (re-find
+           #"(?s):check-opt of ':foo' option thrown the following exception when called with 'foo-value' value:.*#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
+           (get-in (ex-data e) [:error :message]))))))
 
 (deftest add-rpcmethod!-test
   (let [plugin (atom {:rpcmethods {}})

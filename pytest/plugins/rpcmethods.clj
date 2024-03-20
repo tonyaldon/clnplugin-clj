@@ -1,4 +1,4 @@
-(ns foo
+(ns rpcmethods
   (:require [clnplugin-clj :as plugin]))
 
 (defn foo-2 [params plugin] {:bar-2 "baz-2"})

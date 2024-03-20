@@ -123,11 +123,56 @@
     (. out (append "\n\n")) ;; required by lightningd
     (. out (flush))))
 
+(defn exception
+  "..."
+  [e]
+  (let [sw (new java.io.StringWriter)]
+    (print-method e sw)
+    (str sw)))
+
+(defn convert-opt-value
+  "..."
+  [value type]
+  ;; at the init round, value have the correct type specified
+  ;; by the plugin.  So we return the value as is.  But,
+  ;; if set dynamically with `setconfig` lightningd command,
+  ;; lightningd send us any value as a string, so we need
+  ;; to convert it to the type specified by the plugin.
+  (if-not (or (string? value) (nil? value))
+    value
+    (cond
+      (or (= type "string") (nil? type)) value
+      (= type "int") (Long/parseLong value)
+      (= type "bool") (Boolean/parseBoolean value)
+      ;; when `setconfig` has just the config argument set,
+      ;; this indicate to turn on the flag.  In that case,
+      ;; value is nil.
+      ;;
+      ;; Note: as far as I understand, there's no way to turn off
+      ;; a flag dynamically as of CLN 24.02
+      (= type "flag") (if (nil? value)
+                        true
+                        (Boolean/parseBoolean value)))))
+
 (defn set-option!
-  "Set KW-OPT to VALUE in PLUGIN.
+  "Set KW-OPT's :value to VALUE in PLUGIN's :options.
+
+  :check-opt function:
+
+  1) Before setting the option's value, call :check-opt function
+     with VALUE and PLUGIN as argument.  If VALUE is not valid for
+     KW-OPT, :check-opt must thrown an exception with a message.
+     For instance, if KW-OPT is :foo, this can be done like this:
+
+         (throw (ex-info \"Wrong option 'foo'\" {}))
+
+  2) If an excetpion is thrown, the plugin will be disable during
+     the init round.  See clnplugin-clj/process-init!
+  3) Side effects, can be done in :check-opt.
+  4) :check-opt is specific to each KW-OPT.
 
   If AT-INIT? is false and KW-OPT is not a dynamic option,
-  raise an exception.
+  throw an exception.
 
   Plugin options must not be set by plugin code but by
 
@@ -140,16 +185,33 @@
   ([[kw-opt value] plugin]
    (set-option! [kw-opt value] plugin false))
   ([[kw-opt value] plugin at-init?]
-   (if (contains? (:options @plugin) kw-opt)
-     (let [is-dynamic? (get-in @plugin [:options kw-opt :dynamic])]
-       (if (or at-init? is-dynamic?)
-         (swap! plugin assoc-in [:options kw-opt :value] value)
-         (throw
-          (let [msg (format "Cannot set '%s' option which is not dynamic.  Add ':dynamic true' to its declaration." kw-opt)]
-            (ex-info msg {:error {:code -32600 :message msg}})))))
-     (throw
-      (let [msg (format "Cannot set '%s' option which has not been declared to lightningd" kw-opt)]
-        (ex-info msg {:error {:code -32600 :message msg}}))))))
+   (let [value (convert-opt-value value (get-in @plugin [:options kw-opt :type]))
+         dynamic? (get-in @plugin [:options kw-opt :dynamic])
+         check-opt (get-in @plugin [:options kw-opt :check-opt])
+         msg (cond
+               (not (contains? (:options @plugin) kw-opt))
+               (format "Cannot set '%s' option which has not been declared to lightningd" kw-opt)
+               (and (not at-init?) (not dynamic?))
+               (format "Cannot set '%s' option which is not dynamic.  Add ':dynamic true' to its declaration." kw-opt)
+               (nil? check-opt)
+               nil
+               (fn? check-opt)
+               (try
+                 (check-opt value plugin)
+                 nil
+                 (catch clojure.lang.ExceptionInfo e (ex-message e))
+                 (catch Exception e
+                   (format ":check-opt of '%s' option thrown the following exception when called with '%s' value: %s"
+                           kw-opt value (exception e))))
+               true
+               (format ":check-opt of '%s' option must be a function not '%s' which is an instance of '%s'"
+                       kw-opt check-opt (class check-opt)))]
+     (if (nil? msg)
+       (swap! plugin assoc-in [:options kw-opt :value] value)
+       (if at-init?
+         (throw (ex-info msg {:disable msg}))
+         (throw (ex-info msg {:error {:code -32600 :message msg}})))))))
+
 
 (defn set-options-at-init!
   "Set OPTIONS in PLUGIN.
@@ -161,13 +223,6 @@
     (doseq [opt (seq options)]
       (set-option! opt plugin :at-init))))
 
-(defn exception
-  "..."
-  [e]
-  (let [sw (new java.io.StringWriter)]
-    (print-method e sw)
-    (str sw)))
-
 (defn process-init!
   "..."
   [req plugin]
@@ -177,22 +232,22 @@
         options (get-in req [:params :options])
         out (:_out @plugin)
         _ (swap! plugin assoc-in [:socket-file] socket-file)
-        _ (set-options-at-init! options plugin)
         _ (add-request! req plugin)
+        opts-disable (try
+                       (set-options-at-init! options plugin)
+                       (catch clojure.lang.ExceptionInfo e (ex-data e)))
+        init-fn (:init-fn @plugin)
         ok-or-disable
-        (if-let [init-fn (:init-fn @plugin)]
-          (if (fn? init-fn)
-            (try
-              (let [result (init-fn req plugin)]
-                (if (and (map? result) (contains? result :disable))
-                  result
-                  {}))
-              (catch Exception e
-                {:disable (exception e)}))
-            (let [msg (format ":init-fn must be a function not '%s' which is an instance of '%s'"
-                              init-fn (class init-fn))]
-              {:disable msg}))
-          {})
+        (cond
+          (and (map? opts-disable) (contains? opts-disable :disable)) opts-disable
+          (nil? init-fn) {}
+          (fn? init-fn) (try
+                          (init-fn req plugin)
+                          {}
+                          (catch clojure.lang.ExceptionInfo e {:disable (ex-message e)})
+                          (catch Exception e {:disable (exception e)}))
+          true {:disable (format ":init-fn must be a function not '%s' which is an instance of '%s'"
+                                 init-fn (class init-fn))})
         resp (assoc {:jsonrpc "2.0" :id (:id req)} :result ok-or-disable)]
     (json/write resp out :escape-slash false)
     (. out (append "\n\n")) ;; required by lightningd

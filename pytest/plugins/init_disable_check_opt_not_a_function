@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+plugin_dir=/home/tony/work/projects/clnplugin-clj/pytest/plugins/
+cd $plugin_dir
+# clojure -M foo.clj
+exec clojure -M init_disable_check_opt_not_a_function.clj

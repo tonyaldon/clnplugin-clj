@@ -3,7 +3,7 @@ from pyln.client import RpcError
 import os
 import time
 
-def test_foo(node_factory):
+def test_rpcmethods(node_factory):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/rpcmethods")
     l1 = node_factory.get_node(options={"plugin": plugin})
     assert l1.rpc.call("foo-0") == {"bar": "baz"}
@@ -29,15 +29,35 @@ def test_init(node_factory):
     assert l1.rpc.call("get-plugin-options-values") == {"foo": "foo-plugin-restarted",
                                                         "bar": "bar-plugin-restarted"}
 
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_not_a_function")
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_check_opt")
+    with pytest.raises(RpcError, match=r"Wrong option 'foo_1'"):
+        l1.rpc.plugin_start(plugin, foo_1="foo-value")
+
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_check_opt_before_init_fn")
+    with pytest.raises(RpcError, match=r"Wrong option 'foo_2'"):
+        l1.rpc.plugin_start(plugin, foo_2="foo-value")
+
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_check_opt_not_a_function")
+    with pytest.raises(RpcError, match=r":check-opt of.*foo_3.*option must be a function not.*[:a-vector \"is not a function\"].*which is an instance of.*class clojure.lang.PersistentVector"):
+        l1.rpc.plugin_start(plugin, foo_3="foo-value")
+
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_check_opt_symbol_not_a_function")
+    with pytest.raises(RpcError, match=r":check-opt of.*foo_.*option must be a function not .*some-symbol.*which is an instance of.*class clojure.lang.Symbol"):
+        l1.rpc.plugin_start(plugin, foo_4="foo-value")
+
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_check_opt_execution_error")
+    with pytest.raises(RpcError, match=r":check-opt of.*foo_5.* option thrown the following exception when called with.*foo-value.*value: #error.*:cause.*Divide by zero.*:type.*java.lang.ArithmeticException"):
+        l1.rpc.plugin_start(plugin, foo_5="foo-value")
+
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_init_fn_not_a_function")
     with pytest.raises(RpcError, match=r":init-fn must be a function"):
         l1.rpc.plugin_start(plugin)
 
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_execution_error")
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_init_fn_execution_error")
     with pytest.raises(RpcError, match=r"#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"):
         l1.rpc.plugin_start(plugin)
 
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable")
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_init_fn")
     with pytest.raises(RpcError, match=r"disabled by user"):
         l1.rpc.plugin_start(plugin)
 
@@ -59,22 +79,84 @@ def test_options_deprecated(node_factory):
 def test_options_dynamic(node_factory):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/options_dynamic")
     l1 = node_factory.get_node(options={"plugin": plugin})
-    setconfig_resp = l1.rpc.setconfig(config="foo-dynamic", val="foo-value-0")
+
+    # foo-no-check-opt
+    setconfig_resp = l1.rpc.setconfig(config="foo-no-check-opt", val="foo-value-0")
     assert setconfig_resp["config"]["value_str"] == "foo-value-0"
     listconfigs_resp = l1.rpc.listconfigs()
-    assert listconfigs_resp["configs"]["foo-dynamic"]["value_str"] == "foo-value-0"
-    assert l1.rpc.call("get-foo-dynamic-value") == {"foo-dynamic": "foo-value-0"}
-
+    assert listconfigs_resp["configs"]["foo-no-check-opt"]["value_str"] == "foo-value-0"
+    assert l1.rpc.call("get-opt-value", {"opt" : "foo-no-check-opt"}) == "foo-value-0"
     l1.stop()
     l1.start()
-    assert listconfigs_resp["configs"]["foo-dynamic"]["value_str"] == "foo-value-0"
-    assert l1.rpc.call("get-foo-dynamic-value") == {"foo-dynamic": "foo-value-0"}
-
-    setconfig_resp = l1.rpc.setconfig(config="foo-dynamic", val="foo-value-1")
+    assert listconfigs_resp["configs"]["foo-no-check-opt"]["value_str"] == "foo-value-0"
+    assert l1.rpc.call("get-opt-value", {"opt" : "foo-no-check-opt"}) == "foo-value-0"
+    setconfig_resp = l1.rpc.setconfig(config="foo-no-check-opt", val="foo-value-1")
     assert setconfig_resp["config"]["value_str"] == "foo-value-1"
     listconfigs_resp = l1.rpc.listconfigs()
-    assert listconfigs_resp["configs"]["foo-dynamic"]["value_str"] == "foo-value-1"
-    assert l1.rpc.call("get-foo-dynamic-value") == {"foo-dynamic": "foo-value-1"}
+    assert listconfigs_resp["configs"]["foo-no-check-opt"]["value_str"] == "foo-value-1"
+    assert l1.rpc.call("get-opt-value", {"opt" : "foo-no-check-opt"}) == "foo-value-1"
+
+    # options of type "int" and "bool"
+    # we test them here because lightningd send setconfig
+    # request with option values (json field "val") being string
+    # and we want to be sure we convert them correctly in
+    # plugin state
+    #
+    # type "int"
+    # {"jsonrpc":"2.0","id":"pytest:setconfig#22/cln:setconfig#41","method":"setconfig","params":{"config":"foo-int-positive","val":"12"}}
+    setconfig_resp = l1.rpc.setconfig(config="foo-int", val=12)
+    assert setconfig_resp["config"]["value_int"] == 12
+    listconfigs_resp = l1.rpc.listconfigs()
+    assert listconfigs_resp["configs"]["foo-int"]["value_int"] == 12
+    assert l1.rpc.call("get-opt-value", {"opt" : "foo-int"}) == 12
+    setconfig_resp = l1.rpc.setconfig(config="foo-int", val=-12)
+    assert setconfig_resp["config"]["value_int"] == -12
+    listconfigs_resp = l1.rpc.listconfigs()
+    assert listconfigs_resp["configs"]["foo-int"]["value_int"] == -12
+    assert l1.rpc.call("get-opt-value", {"opt" : "foo-int"}) == -12
+
+    # type "bool"
+    # {"jsonrpc":"2.0","id":"pytest:setconfig#34/cln:setconfig#45","method":"setconfig","params":{"config":"foo-bool","val":"true"}}
+    setconfig_resp = l1.rpc.setconfig(config="foo-bool", val=True)
+    assert setconfig_resp["config"]["value_bool"] == True
+    listconfigs_resp = l1.rpc.listconfigs()
+    assert listconfigs_resp["configs"]["foo-bool"]["value_bool"] == True
+    assert l1.rpc.call("get-opt-value", {"opt" : "foo-bool"}) == True
+    setconfig_resp = l1.rpc.setconfig(config="foo-bool", val=False)
+    assert setconfig_resp["config"]["value_bool"] == False
+    listconfigs_resp = l1.rpc.listconfigs()
+    assert listconfigs_resp["configs"]["foo-bool"]["value_bool"] == False
+    assert l1.rpc.call("get-opt-value", {"opt" : "foo-bool"}) == False
+
+    # type "flag"
+    setconfig_resp = l1.rpc.setconfig(config="foo-flag")
+    assert setconfig_resp["config"]["set"] == True
+    listconfigs_resp = l1.rpc.listconfigs()
+    assert listconfigs_resp["configs"]["foo-flag"]["set"] == True
+    assert l1.rpc.call("get-opt-value", {"opt" : "foo-flag"}) == True
+
+    # foo-with-check-opt
+    setconfig_resp = l1.rpc.setconfig(config="foo-with-check-opt", val=12)
+    assert setconfig_resp["config"]["value_int"] == 12
+    listconfigs_resp = l1.rpc.listconfigs()
+    assert listconfigs_resp["configs"]["foo-with-check-opt"]["value_int"] == 12
+    assert l1.rpc.call("get-opt-value", {"opt" : "foo-with-check-opt"}) == 12
+    with pytest.raises(RpcError, match=r".*foo-with-check-opt.* option must be positive -1 type class java.lang.Long"):
+        l1.rpc.setconfig(config="foo-with-check-opt", val=-1)
+    assert l1.daemon.is_in_log(r"Error while processing.*:method.*setconfig.*:params.*foo-with-check-opt")
+    assert l1.daemon.is_in_log(r".*foo-with-check-opt.* option must be positive -1 type class java.lang.Long")
+
+    # foo-wrong-check-opt
+    with pytest.raises(RpcError, match=r":check-opt of.*:foo-wrong-check-opt.*option must be a function not.*[:a-vector \"is not a function\"].*which is an instance of.*class clojure.lang.PersistentVector"):
+        l1.rpc.setconfig(config="foo-wrong-check-opt", val="foo-value")
+    assert l1.daemon.is_in_log(r"Error while processing.*:method.*setconfig.*:params.*foo-wrong-check-opt.*")
+    assert l1.daemon.is_in_log(r":check-opt of.*:foo-wrong-check-opt.*option must be a function not.*[:a-vector \"is not a function\"].*which is an instance of.*class clojure.lang.PersistentVector")
+
+    # foo-error-in-check-opt
+    with pytest.raises(RpcError, match=r":check-opt of.*:foo-error-in-check-opt.* option thrown the following exception when called with.*foo-value.*value: #error.*:cause.*Divide by zero.*:type.*java.lang.ArithmeticException"):
+        l1.rpc.setconfig(config="foo-error-in-check-opt", val="foo-value")
+    assert l1.daemon.is_in_log(r"Error while processing.*setconfig.*:params.*foo-error-in-check-opt")
+    assert l1.daemon.is_in_log(r":check-opt of.*:foo-error-in-check-opt.* option thrown the following exception when called with.*foo-value.*value: #error.*:cause.*Divide by zero.*:type.*java.lang.ArithmeticException")
 
 
 def test_log(node_factory):

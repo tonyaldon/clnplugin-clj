@@ -1,4 +1,4 @@
-(ns deprecated-options
+(ns options-deprecated
   (:require [clnplugin-clj :as plugin]))
 
 (def plugin
