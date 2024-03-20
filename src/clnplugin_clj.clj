@@ -64,9 +64,12 @@
                 (not (fn? method-fn))
                 (throw (ex-info (format "Error in '%s' RPC method definition.  :fn must be a function not '%s' which is an instance of '%s'"
                                         kw-name method-fn (class method-fn)) {}))))
-            {:name (name kw-name)
-             :usage (get method :usage "")
-             :description (get method :description "")})]
+            (merge {:name (name kw-name)
+                    :usage (get method :usage "")
+                    :description (get method :description "")}
+                   (when-let [l-desc (:long_description method)]
+                     {:long_description l-desc})
+                   (when (:deprecated method) {:deprecated true})))]
     (mapv f (seq rpcmethods))))
 
 (defn gm-resp

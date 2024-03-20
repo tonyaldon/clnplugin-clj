@@ -14,6 +14,15 @@ def test_rpcmethods(node_factory):
     assert l1.rpc.call("foo-3") == {}
     assert l1.rpc.call("foo-4") == {"bar-4": "baz-3"}
 
+    l2 = node_factory.get_node(options={'allow-deprecated-apis': False})
+    l2.rpc.plugin_start(plugin=plugin)
+    with pytest.raises(RpcError, match=r"Command \"foo-deprecated\" is deprecated"):
+        l2.rpc.call("foo-deprecated")
+
+    l3 = node_factory.get_node(options={'allow-deprecated-apis': True})
+    l3.rpc.plugin_start(plugin=plugin)
+    assert l3.rpc.call("foo-deprecated") == {"bar": "baz"}
+
 
 def test_getmanifest(node_factory):
     l1 = node_factory.get_node()

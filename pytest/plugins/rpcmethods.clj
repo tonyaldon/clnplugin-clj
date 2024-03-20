@@ -14,7 +14,8 @@
           :foo-4 {:fn (fn [params plugin]
                         {:bar-4 (loop [bar-3 nil]
                                   (or bar-3 (recur (:bar-3 @plugin))))})}
-          }}))
+          :foo-deprecated {:fn (fn [params plugin] {:bar "baz"})
+                           :deprecated true}}}))
 
 
 (plugin/run plugin)

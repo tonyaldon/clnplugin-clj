@@ -115,11 +115,20 @@
                    :fn (fn [params plugin])}
            :foo-4 {:usage "usage-4"
                    :description "description-4"
-                   :fn (fn [params plugin])}})
+                   :fn (fn [params plugin])}
+           :foo-5 {:usage "usage-5"
+                   :description "description-5"
+                   :long_description "long-description-5"
+                   :fn (fn [params plugin])}
+           :foo-6 {:fn (fn [params plugin])
+                   :deprecated true}})
          [{:name "foo-1" :usage "" :description ""}
           {:name "foo-2" :usage "usage-2" :description ""}
           {:name "foo-3" :usage "" :description "description-3"}
-          {:name "foo-4" :usage "usage-4" :description "description-4"}]))
+          {:name "foo-4" :usage "usage-4" :description "description-4"}
+          {:name "foo-5" :usage "usage-5" :description "description-5"
+           :long_description "long-description-5"}
+          {:name "foo-6" :usage "" :description "" :deprecated true}]))
   ;; :fn is not defined
   (is (thrown-with-msg?
        Throwable
