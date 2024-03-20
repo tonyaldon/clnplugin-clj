@@ -468,8 +468,7 @@
   [req plugin]
   (go
     (let [method (keyword (:method req))
-          method-fn (let [fn (get-in (:rpcmethods @plugin) [method :fn])]
-                      (if (symbol? fn) (eval fn) fn))
+          method-fn (get-in (:rpcmethods @plugin) [method :fn])
           result-or-error
           (try
             (if (fn? method-fn)

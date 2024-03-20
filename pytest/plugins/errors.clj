@@ -11,6 +11,7 @@
                                   {:code -100 :message msg}}))))}
           :execution-error {:fn (fn [params plugin] (/ 1 0))}
           :not-a-function {:fn [:a-vector "is not a function"]}
+          :symbol-is-not-a-function {:fn 'some-symbol}
           :non-json-writable-in-result
           {:fn (fn [params plugin]
                  ;; `swap!` returns new value of plugin

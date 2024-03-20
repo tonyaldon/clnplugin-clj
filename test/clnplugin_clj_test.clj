@@ -889,26 +889,23 @@
 
 (deftest process-test
   (let [foo-2 (fn [params plugin] {:bar-2 "baz-2"})
-        _ (defn foo-3 [params plugin] {:bar-3 "baz-3"})
         plugin (atom {:rpcmethods
                       {:foo-0 {:fn (fn [params plugin] {:bar "baz"})}
                        :foo-1 {:fn (fn [params plugin] {:bar-1 (:baz-1 params)})}
                        :foo-2 {:fn foo-2}
-                       :foo-3 {:fn 'clnplugin-clj-test/foo-3}
-                       :foo-4 {:fn (fn [params plugin]
-                                     (swap! plugin assoc :bar-4 "baz-4")
+                       :foo-3 {:fn (fn [params plugin]
+                                     (swap! plugin assoc :bar-3 "baz-3")
                                      {})}
-                       :foo-5 {:fn (fn [params plugin]
-                                     {:bar-5 (loop [bar-4 nil]
-                                               (or bar-4 (recur (:bar-4 @plugin))))})}}
+                       :foo-4 {:fn (fn [params plugin]
+                                     {:bar-4 (loop [bar-3 nil]
+                                               (or bar-3 (recur (:bar-3 @plugin))))})}}
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
         req-0 {:jsonrpc "2.0" :id "id-0" :method "foo-0" :params {}}
         req-1 {:jsonrpc "2.0" :id "id-1" :method "foo-1" :params {:baz-1 "baz-1"}}
         req-2 {:jsonrpc "2.0" :id "id-2" :method "foo-2" :params {}}
         req-3 {:jsonrpc "2.0" :id "id-3" :method "foo-3" :params {}}
-        req-4 {:jsonrpc "2.0" :id "id-4" :method "foo-4" :params {}}
-        req-5 {:jsonrpc "2.0" :id "id-5" :method "foo-5" :params {}}]
+        req-4 {:jsonrpc "2.0" :id "id-4" :method "foo-4" :params {}}]
     (plugin/process req-0 plugin)
     (Thread/sleep 100) ;; because `plugin/process` calls are asynchronous (in go blocks)
     (plugin/process req-1 plugin)
@@ -918,8 +915,6 @@
     (plugin/process req-3 plugin)
     (Thread/sleep 100)
     (plugin/process req-4 plugin)
-    (Thread/sleep 100)
-    (plugin/process req-5 plugin)
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
     (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
@@ -928,9 +923,8 @@
              '({:jsonrpc "2.0" :id "id-0" :result {:bar "baz"}}
                {:jsonrpc "2.0" :id "id-1" :result {:bar-1 "baz-1"}}
                {:jsonrpc "2.0" :id "id-2" :result {:bar-2 "baz-2"}}
-               {:jsonrpc "2.0" :id "id-3" :result {:bar-3 "baz-3"}}
-               {:jsonrpc "2.0" :id "id-4" :result {}}
-               {:jsonrpc "2.0" :id "id-5" :result {:bar-5 "baz-4"}})))))
+               {:jsonrpc "2.0" :id "id-3" :result {}}
+               {:jsonrpc "2.0" :id "id-4" :result {:bar-4 "baz-3"}})))))
 
   ;; Custom errors raised by user
   (let [plugin (atom {:rpcmethods
@@ -1063,6 +1057,25 @@
       (is (re-find #"Error while processing ':not-a-function' method, '\[:a-vector \"is not a function\"\]' value of :fn is not a function"
                    (get-in resp [:error :message])))
       (is (some #(re-find #"Error while processing ':not-a-function' method, '\[:a-vector \"is not a function\"\]' value of :fn is not a function"
+                          (get-in % [:params :message]))
+                resp-and-logs))))
+  ;; error because :fn is not a function (we don't symbol as value of :fn)
+  (let [plugin (atom {:rpcmethods
+                      {:not-a-function
+                       {:fn 'some-symbol}}
+                      :_out (new java.io.StringWriter)
+                      :_resps (agent nil)})
+        req {:jsonrpc "2.0" :id "some-id" :method "not-a-function" :params {}}]
+    (plugin/process req plugin)
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
+    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
+          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
+          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+      (is (= (get-in resp [:error :code]) -32600))
+      (is (re-find #"Error while processing ':not-a-function' method, 'some-symbol' value of :fn is not a function"
+                   (get-in resp [:error :message])))
+      (is (some #(re-find #"Error while processing ':not-a-function' method, 'some-symbol' value of :fn is not a function"
                           (get-in % [:params :message]))
                 resp-and-logs))))
 

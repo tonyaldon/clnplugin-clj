@@ -9,11 +9,10 @@ def test_rpcmethods(node_factory):
     assert l1.rpc.call("foo-0") == {"bar": "baz"}
     assert l1.rpc.call("foo-1", {"baz-1": "baz-1"}) == {"bar-1": "baz-1"}
     assert l1.rpc.call("foo-2") == {"bar-2": "baz-2"}
-    assert l1.rpc.call("foo-3") == {"bar-3": "baz-3"}
-    # foo-4 must be call before foo-5 because it sets a value in plugin atom
-    # that we want to get with foo-5
-    assert l1.rpc.call("foo-4") == {}
-    assert l1.rpc.call("foo-5") == {"bar-5": "baz-4"}
+    # foo-3 must be call before foo-4 because it sets a value in plugin atom
+    # that we want to get with foo-4
+    assert l1.rpc.call("foo-3") == {}
+    assert l1.rpc.call("foo-4") == {"bar-4": "baz-3"}
 
 
 def test_init(node_factory):
@@ -186,6 +185,9 @@ def test_errors(node_factory):
     with pytest.raises(RpcError, match=r"Error while processing.*:not-a-function.*method, .*[:a-vector \"is not a function\"].*value of :fn is not a function"):
         l1.rpc.call("not-a-function")
     assert l1.daemon.is_in_log(r"Error while processing.*:not-a-function.*method, .*[:a-vector \"is not a function\"].*value of :fn is not a function")
+    with pytest.raises(RpcError, match=r"Error while processing.*:symbol-is-not-a-function.*method, .*some-symbol.*value of :fn is not a function"):
+        l1.rpc.call("symbol-is-not-a-function")
+    assert l1.daemon.is_in_log(r"Error while processing.*:symbol-is-not-a-function.*method, .*some-symbol.*value of :fn is not a function")
     with pytest.raises(RpcError, match=r"Error while processing.*:method.*non-json-writable-in-result"):
         l1.rpc.call("non-json-writable-in-result")
     assert l1.daemon.is_in_log(r"Error while processing.*method.*non-json-writable-in-result")
