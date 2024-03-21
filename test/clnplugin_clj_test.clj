@@ -954,7 +954,7 @@
     ;; test that notify returns nil so that it can be used
     ;; as last expression in :fn of RPC methods which expect
     ;; a json writable object as last expression
-    (is (nil? (plugin/log plugin message)))
+    (is (nil? (plugin/log message plugin)))
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
     (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
@@ -964,7 +964,7 @@
   (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
         message "bar"
         level "debug"]
-    (is (nil? (plugin/log plugin message level)))
+    (is (nil? (plugin/log message level plugin)))
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
     (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
@@ -973,7 +973,7 @@
             :params {:level "debug" :message "bar"}})))
   (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
         message "foo-1\nfoo-2\nfoo-3\n"]
-    (plugin/log plugin message)
+    (plugin/log message plugin)
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
     (is (= (let [srdr (java.io.StringReader. (str (:_out @plugin)))

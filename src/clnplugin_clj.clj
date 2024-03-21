@@ -475,9 +475,9 @@
   our plugin stops working correctly and throws exceptions.
 
   See clnplugin-clj/exception"
-  ([plugin message]
-   (log plugin message "info"))
-  ([plugin message level]
+  ([message plugin]
+   (log message "info" plugin))
+  ([message level plugin]
    (let [notifs (map #(vector nil (notif "log" {:level level :message %}))
                      (str/split-lines message))]
      (send (:_resps @plugin) write notifs (:_out @plugin)))
@@ -528,13 +528,13 @@
               (let [msg (format "Error while processing '%s'" req)
                     error (merge {:code -32603 :message msg}
                                  (:error (ex-data e)))]
-                (log plugin msg "debug")
-                (log plugin (format "%s" error) "debug")
+                (log msg "debug" plugin)
+                (log (format "%s" error) "debug" plugin)
                 {:error error}))
             (catch Exception e
               (let [msg (format "Error while processing '%s'" req)]
-                (log plugin msg "debug")
-                (log plugin (exception e) "debug")
+                (log msg "debug" plugin)
+                (log (exception e) "debug" plugin)
                 {:error {:code -32603
                          :message msg
                          :exception (exception e)}})))

@@ -1,4 +1,4 @@
-(ns log
+(ns notifications
   (:require [clnplugin-clj :as plugin]))
 
 (def plugin
