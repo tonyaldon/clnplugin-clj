@@ -896,7 +896,10 @@
 (deftest log-test
   (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
         message "foo"]
-    (plugin/log plugin message)
+    ;; test that notify returns nil so that it can be used
+    ;; as last expression in :fn of RPC methods which expect
+    ;; a json writable object as last expression
+    (is (nil? (plugin/log plugin message)))
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
     (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
@@ -906,7 +909,7 @@
   (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
         message "bar"
         level "debug"]
-    (plugin/log plugin message level)
+    (is (nil? (plugin/log plugin message level)))
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
     (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
