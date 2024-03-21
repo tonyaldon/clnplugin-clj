@@ -4,14 +4,14 @@
 (def plugin
   (atom {:rpcmethods
          {:custom-error
-          {:fn (fn [params plugin]
+          {:fn (fn [params req plugin]
                  (throw
                   (let [msg "custom-error"]
                     (ex-info msg {:error
                                   {:code -100 :message msg}}))))}
-          :execution-error {:fn (fn [params plugin] (/ 1 0))}
+          :execution-error {:fn (fn [params req plugin] (/ 1 0))}
           :non-json-writable-in-result
-          {:fn (fn [params plugin]
+          {:fn (fn [params req plugin]
                  ;; `swap!` returns new value of plugin
                  ;; which contains :_out and :_resps (non
                  ;; json writable) and as it is the last
@@ -22,7 +22,7 @@
                  ;; and return an json rpc error to lightningd.
                  (swap! plugin assoc :bar "baz"))}
           :non-json-writable-in-error
-          {:fn (fn [params plugin]
+          {:fn (fn [params req plugin]
                  (throw
                   ;; atom as :message value is not json writable
                   (ex-info "non-json-writable-in-error"

@@ -26,7 +26,7 @@
                                             :check-opt (fn [value plugin] (/ 1 0))}}
          :rpcmethods
          {:get-opt-value
-          {:fn (fn [params plugin]
+          {:fn (fn [params req plugin]
                  (get-in @plugin [:options (keyword (:opt params)) :value]))}}}))
 
 (plugin/run plugin)

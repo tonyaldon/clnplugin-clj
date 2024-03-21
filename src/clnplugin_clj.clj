@@ -322,7 +322,7 @@
   - sets the option :foo-opt to \"foo-value\" in :options map
     of PLUGIN and,
   - returns an empty map if everything is OK."
-  [params plugin]
+  [params req plugin]
   (let [kw-opt (keyword (:config params))
         value (:val params)]
     (set-option! [kw-opt value] plugin)
@@ -523,7 +523,7 @@
           method-fn (get-in (:rpcmethods @plugin) [method :fn])
           result-or-error
           (try
-            {:result (method-fn (:params req) plugin)}
+            {:result (method-fn (:params req) req plugin)}
             (catch clojure.lang.ExceptionInfo e
               (let [msg (format "Error while processing '%s'" req)
                     error (merge {:code -32603 :message msg}

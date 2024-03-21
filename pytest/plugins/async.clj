@@ -5,7 +5,7 @@
 
 (def plugin
   (atom {:rpcmethods
-         {:async {:fn (fn [params plugin]
+         {:async {:fn (fn [params req plugin]
                         (Thread/sleep 1000)
                         {:counter (swap! counter inc)})}}}))
 

@@ -105,22 +105,22 @@
   (is (= (plugin/gm-rpcmethods
           {:foo {:usage "usage"
                  :description "description"
-                 :fn (fn [params plugin])}})
+                 :fn (fn [params req plugin])}})
          [{:name "foo" :usage "usage" :description "description"}]))
   (is (= (plugin/gm-rpcmethods
-          {:foo-1 {:fn (fn [params plugin])}
+          {:foo-1 {:fn (fn [params req plugin])}
            :foo-2 {:usage "usage-2"
-                   :fn (fn [params plugin])}
+                   :fn (fn [params req plugin])}
            :foo-3 {:description "description-3"
-                   :fn (fn [params plugin])}
+                   :fn (fn [params req plugin])}
            :foo-4 {:usage "usage-4"
                    :description "description-4"
-                   :fn (fn [params plugin])}
+                   :fn (fn [params req plugin])}
            :foo-5 {:usage "usage-5"
                    :description "description-5"
                    :long_description "long-description-5"
-                   :fn (fn [params plugin])}
-           :foo-6 {:fn (fn [params plugin])
+                   :fn (fn [params req plugin])}
+           :foo-6 {:fn (fn [params req plugin])
                    :deprecated true}})
          [{:name "foo-1" :usage "" :description ""}
           {:name "foo-2" :usage "usage-2" :description ""}
@@ -214,11 +214,11 @@
                                 :foo-4 {:type "string"
                                         :description "foo-4-description"
                                         :multi true}}
-                      :rpcmethods {:foo-1 {:fn (fn [param plugin])}
+                      :rpcmethods {:foo-1 {:fn (fn [params req plugin])}
                                    :foo-2 {:usage "usage-2"
-                                           :fn (fn [param plugin])}
+                                           :fn (fn [params req plugin])}
                                    :foo-3 {:description "description-3"
-                                           :fn (fn [param plugin])}
+                                           :fn (fn [params req plugin])}
                                    :foo-4 {:usage "usage-4"
                                            :description "description-4"
                                            :fn (fn [param plugin])}}
@@ -341,7 +341,7 @@
 
 (deftest process-getmanifest!-test
   (let [plugin (atom {:options {:opt 'opt}
-                      :rpcmethods {:foo {:fn (fn [params plugin])}}
+                      :rpcmethods {:foo {:fn (fn [params req plugin])}}
                       :dynamic true
                       :_out (new java.io.StringWriter)})
         req {:jsonrpc "2.0" :id 0 :method "getmanifest" :params {:allow-deprecated-apis false}}]
@@ -757,7 +757,7 @@
   ;; way to turn off a flag option dynamically as of CLN 24.02.
   (let [plugin (atom {:options {:foo {:dynamic true}}})
         params {:config "foo", :val "foo-value"}
-        resp (plugin/setconfig! params plugin)]
+        resp (plugin/setconfig! params nil plugin)]
     (is (= resp {}))
     (is (= @plugin {:options {:foo {:value "foo-value"
                                     :dynamic true}}})))
@@ -765,11 +765,11 @@
                                       :dynamic true}}})
         params-0 {:config "foo", :val "12"}
         params-1 {:config "foo", :val "-12"}]
-    (is (= (plugin/setconfig! params-0 plugin) {}))
+    (is (= (plugin/setconfig! params-0 nil plugin) {}))
     (is (= @plugin {:options {:foo {:value 12
                                     :type "int"
                                     :dynamic true}}}))
-    (is (= (plugin/setconfig! params-1 plugin) {}))
+    (is (= (plugin/setconfig! params-1 nil plugin) {}))
     (is (= @plugin {:options {:foo {:value -12
                                     :type "int"
                                     :dynamic true}}})))
@@ -777,25 +777,25 @@
                                       :dynamic true}}})
         params-0 {:config "foo", :val "true"}
         params-1 {:config "foo", :val "false"}]
-    (is (= (plugin/setconfig! params-0 plugin) {}))
+    (is (= (plugin/setconfig! params-0 nil plugin) {}))
     (is (= @plugin {:options {:foo {:value true
                                     :type "bool"
                                     :dynamic true}}}))
-    (is (= (plugin/setconfig! params-1 plugin) {}))
+    (is (= (plugin/setconfig! params-1 nil plugin) {}))
     (is (= @plugin {:options {:foo {:value false
                                     :type "bool"
                                     :dynamic true}}})))
   (let [plugin (atom {:options {:foo {:type "flag"
                                       :dynamic true}}})
         params {:config "foo"}]
-    (is (= (plugin/setconfig! params plugin) {}))
+    (is (= (plugin/setconfig! params nil plugin) {}))
     (is (= @plugin {:options {:foo {:value true
                                     :type "flag"
                                     :dynamic true}}})))
   (try
     (let [plugin (atom {:options {:foo nil}})
           params {:config "foo", :val "foo-value"}]
-      (plugin/setconfig! params plugin))
+      (plugin/setconfig! params nil plugin))
     (catch Exception e
       (is (= (ex-data e)
              {:error {:code -32602
@@ -809,10 +809,10 @@
                                        (throw (ex-info "'foo' option must be positive" {}))))}}})
         params-ok {:config "foo", :val 12}
         params-wrong {:config "foo", :val -1}]
-    (is (= (plugin/setconfig! params-ok plugin) {}))
+    (is (= (plugin/setconfig! params-ok nil plugin) {}))
     (is (= (get-in @plugin [:options :foo :value]) 12))
     (try
-      (plugin/setconfig! params-wrong plugin)
+      (plugin/setconfig! params-wrong nil plugin)
       (catch Exception e
         (is (= (ex-data e)
                {:error {:code -32602 :message "'foo' option must be positive"}})))))
@@ -822,7 +822,7 @@
                          {:dynamic true
                           :check-opt [:a-vector "is not a function"]}}})
           params {:config "foo", :val "foo-value"}]
-      (plugin/setconfig! params plugin))
+      (plugin/setconfig! params nil plugin))
     (catch Exception e
       (is (= (ex-data e)
              {:error {:code -32602
@@ -834,7 +834,7 @@
                          {:dynamic true
                           :check-opt (fn [value plugin] (/ 1 0))}}})
           params {:config "foo", :val "foo-value"}]
-      (plugin/setconfig! params plugin))
+      (plugin/setconfig! params nil plugin))
     (catch Exception e
       ;; (prn e)
       (is (re-find
@@ -843,7 +843,7 @@
 
 (deftest add-rpcmethod!-test
   (let [plugin (atom {:rpcmethods {}})
-        foo-fn (fn [params plugin] {:bar "baz"})]
+        foo-fn (fn [params req plugin] {:bar "baz"})]
     (plugin/add-rpcmethod! :foo foo-fn plugin)
     (is (= (get-in @plugin [:rpcmethods :foo :fn])
            foo-fn))
@@ -1020,24 +1020,26 @@
                 logs)))))
 
 (deftest process-test
-  (let [foo-2 (fn [params plugin] {:bar-2 "baz-2"})
+  (let [foo-2 (fn [params req plugin] {:bar-2 "baz-2"})
         plugin (atom {:rpcmethods
-                      {:foo-0 {:fn (fn [params plugin] {:bar "baz"})}
-                       :foo-1 {:fn (fn [params plugin] {:bar-1 (:baz-1 params)})}
+                      {:foo-0 {:fn (fn [params req plugin] {:bar "baz"})}
+                       :foo-1 {:fn (fn [params req plugin] {:bar-1 (:baz-1 params)})}
                        :foo-2 {:fn foo-2}
-                       :foo-3 {:fn (fn [params plugin]
-                                     (swap! plugin assoc :bar-3 "baz-3")
+                       :foo-3 {:fn (fn [params req plugin] {:bar-3 (:id req)})}
+                       :foo-4 {:fn (fn [params req plugin]
+                                     (swap! plugin assoc :bar-4 "baz-4")
                                      {})}
-                       :foo-4 {:fn (fn [params plugin]
-                                     {:bar-4 (loop [bar-3 nil]
-                                               (or bar-3 (recur (:bar-3 @plugin))))})}}
+                       :foo-5 {:fn (fn [params req plugin]
+                                     {:bar-5 (loop [bar-4 nil]
+                                               (or bar-4 (recur (:bar-4 @plugin))))})}}
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
         req-0 {:jsonrpc "2.0" :id "id-0" :method "foo-0" :params {}}
         req-1 {:jsonrpc "2.0" :id "id-1" :method "foo-1" :params {:baz-1 "baz-1"}}
         req-2 {:jsonrpc "2.0" :id "id-2" :method "foo-2" :params {}}
         req-3 {:jsonrpc "2.0" :id "id-3" :method "foo-3" :params {}}
-        req-4 {:jsonrpc "2.0" :id "id-4" :method "foo-4" :params {}}]
+        req-4 {:jsonrpc "2.0" :id "id-4" :method "foo-4" :params {}}
+        req-5 {:jsonrpc "2.0" :id "id-5" :method "foo-5" :params {}}]
     (plugin/process req-0 plugin)
     (Thread/sleep 100) ;; because `plugin/process` calls are asynchronous (in go blocks)
     (plugin/process req-1 plugin)
@@ -1047,6 +1049,8 @@
     (plugin/process req-3 plugin)
     (Thread/sleep 100)
     (plugin/process req-4 plugin)
+    (Thread/sleep 100)
+    (plugin/process req-5 plugin)
     (await (:_resps @plugin))
     (Thread/sleep 100) ;; if we don't wait, :_out would be empty
     (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
@@ -1055,13 +1059,14 @@
              '({:jsonrpc "2.0" :id "id-0" :result {:bar "baz"}}
                {:jsonrpc "2.0" :id "id-1" :result {:bar-1 "baz-1"}}
                {:jsonrpc "2.0" :id "id-2" :result {:bar-2 "baz-2"}}
-               {:jsonrpc "2.0" :id "id-3" :result {}}
-               {:jsonrpc "2.0" :id "id-4" :result {:bar-4 "baz-3"}})))))
+               {:jsonrpc "2.0" :id "id-3" :result {:bar-3 "id-3"}}
+               {:jsonrpc "2.0" :id "id-4" :result {}}
+               {:jsonrpc "2.0" :id "id-5" :result {:bar-5 "baz-4"}})))))
 
   ;; Custom errors raised by user
   (let [plugin (atom {:rpcmethods
                       {:custom-error
-                       {:fn (fn [params plugin]
+                       {:fn (fn [params req plugin]
                               (throw
                                (let [msg "custom-error"]
                                  (ex-info msg {:error
@@ -1091,7 +1096,7 @@
   ;; so it is set to -32603
   (let [plugin (atom {:rpcmethods
                       {:custom-error
-                       {:fn (fn [params plugin]
+                       {:fn (fn [params req plugin]
                               (throw
                                (let [msg "custom-error"]
                                  (ex-info msg {:error {:message msg}}))))}}
@@ -1112,7 +1117,7 @@
   ;; missing :message key in the error thrown by :fn
   (let [plugin (atom {:rpcmethods
                       {:custom-error
-                       {:fn (fn [params plugin]
+                       {:fn (fn [params req plugin]
                               (throw
                                (ex-info "custom-error" {:error {:code -100}})))}}
                       :_out (new java.io.StringWriter)
@@ -1130,7 +1135,7 @@
   ;; empty data in the error thrown by :fn
   (let [plugin (atom {:rpcmethods
                       {:custom-error
-                       {:fn (fn [params plugin]
+                       {:fn (fn [params req plugin]
                               (throw
                                (ex-info "custom-error" {})))}}
                       :_out (new java.io.StringWriter)
@@ -1148,7 +1153,7 @@
   ;; Execution errors
   (let [plugin (atom {:rpcmethods
                       {:execution-error
-                       {:fn (fn [params plugin] (/ 1 0))}}
+                       {:fn (fn [params req plugin] (/ 1 0))}}
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
         req {:jsonrpc "2.0" :id "some-id" :method "execution-error" :params {}}]
@@ -1179,7 +1184,7 @@
   ;; json rpc result with non json writable
   (let [plugin (atom {:rpcmethods
                       {:non-json-writable-in-result
-                       {:fn (fn [params plugin]
+                       {:fn (fn [params req plugin]
                               ;; `swap!` returns new value of plugin
                               ;; which contains :_out and :_resps (non
                               ;; json writable) and as it is the last
@@ -1224,7 +1229,7 @@
   ;; json rpc error with non json writable
   (let [plugin (atom {:rpcmethods
                       {:non-json-writable-in-error
-                       {:fn (fn [params plugin]
+                       {:fn (fn [params req plugin]
                               (throw
                                ;; atom as :message value is not json writable
                                (ex-info "non-json-writable-in-error"

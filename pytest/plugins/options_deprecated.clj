@@ -7,7 +7,7 @@
                                     :deprecated true}}
          :rpcmethods
          {:get-foo_deprecated-value
-          {:fn (fn [params plugin]
+          {:fn (fn [params req plugin]
                  {:foo_deprecated (get-in @plugin [:options :foo_deprecated :value])})}}}))
 
 (plugin/run plugin)
