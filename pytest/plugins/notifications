@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+plugin_dir=/home/tony/work/projects/clnplugin-clj/pytest/plugins/
+cd $plugin_dir
+# clojure -M foo.clj
+# exec clojure -J-Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -M notifications.clj
+exec clojure -M notifications.clj

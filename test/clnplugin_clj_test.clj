@@ -145,6 +145,40 @@
        #"Error in ':foo' RPC method definition.  :fn must be a function not 'some-symbol' which is an instance of 'class clojure.lang.Symbol'"
        (plugin/gm-rpcmethods {:foo {:fn 'some-symbol}}))))
 
+(deftest gm-notifications-test
+  (is (= (plugin/gm-notifications nil) nil))
+  (is (= (plugin/gm-notifications ["foo-1" "foo-2" "foo-3"])
+         [{:method "foo-1"} {:method "foo-2"} {:method "foo-3"}]))
+  ;; Don't let the user declare "log", "progress" or "message" notification
+  ;; topics to lightningd.  If they do so, they may are going to use there
+  ;; own functions to send those notifications which may result in lightningd
+  ;; shutting down the plugin with
+  ;;
+  ;;     {
+  ;;      "code": -4,
+  ;;      "message": "Plugin terminated before replying to RPC call."
+  ;;     }
+  ;;
+  ;; response and something like this in the log file (for a "message"
+  ;; topic with no "id" fields in the params field)
+  ;;
+  ;;     2024-03-21T09:39:29.127Z UNUSUAL plugin-notifications: Killing plugin: JSON-RPC notify "id"-field is not present
+  ;;
+  ;; if they don't respect params field of the JSON RPC notifications
+  ;; expected by lightningd for those 3 specific topics.
+  (is (thrown-with-msg?
+       Throwable
+       #"Remove 'log' from :notifications vector."
+       (plugin/gm-notifications ["log"])))
+  (is (thrown-with-msg?
+       Throwable
+       #"Remove 'message' from :notifications vector."
+       (plugin/gm-notifications ["message"])))
+  (is (thrown-with-msg?
+       Throwable
+       #"Remove 'progress' from :notifications vector."
+       (plugin/gm-notifications ["progress"]))))
+
 (deftest gm-resp-test
   ;; defaults
   (is (= (let [plugin (atom {:options {}
@@ -211,8 +245,7 @@
                                 {:name "foo-2" :usage "usage-2" :description ""}
                                 {:name "foo-3" :usage "" :description "description-3"}
                                 {:name "foo-4" :usage "usage-4" :description "description-4"}]
-                   :dynamic true}
-          }))
+                   :dynamic true}}))
   ;; error because :fn is not a function for foo rpcmethod
   (is (thrown-with-msg?
        Throwable
@@ -220,6 +253,29 @@
        (let [plugin (atom {:options {}
                            :rpcmethods {:foo {:fn [:a-vector "is not a function"]}}
                            :dynamic true})
+             req {:id 16}]
+         (plugin/gm-resp req plugin))))
+  ;; notifications ok
+  (is (= (let [plugin (atom {:options {}
+                             :rpcmethods {}
+                             :dynamic true
+                             :notifications ["topic-1" "topic-2" "topic-3"]})
+               req {:id 16}]
+           (plugin/gm-resp req plugin))
+         {:jsonrpc "2.0"
+          :id 16
+          :result {:options []
+                   :rpcmethods []
+                   :dynamic true
+                   :notifications [{:method "topic-1"} {:method "topic-2"} {:method "topic-3"}]}}))
+  ;; "log", "message", "progress" notifications not to be declared
+  (is (thrown-with-msg?
+       Throwable
+       #"Remove 'progress' from :notifications vector."
+       (let [plugin (atom {:options {}
+                           :rpcmethods {}
+                           :dynamic true
+                           :notifications ["progress"]})
              req {:id 16}]
          (plugin/gm-resp req plugin)))))
 
@@ -795,7 +851,6 @@
     (is (= (get-in @plugin [:rpcmethods :setconfig :fn])
            plugin/setconfig!))))
 
-
 (deftest notif-test
   (let [method "foo" params {:bar "baz"}]
     (is (= (plugin/notif method params)
@@ -928,6 +983,41 @@
            '({:jsonrpc "2.0", :method "log", :params {:level "info", :message "foo-1"}}
              {:jsonrpc "2.0", :method "log", :params {:level "info", :message "foo-2"}}
              {:jsonrpc "2.0", :method "log", :params {:level "info", :message "foo-3"}})))))
+
+(deftest notify-test
+  ;; In these tests, we don't specify :notifications in plugin,
+  ;; because clnplugin-clj doesn't check if we've declared the
+  ;; notifications to lightningd during the getmanifest round.  We
+  ;; just send the notification always.  lightningd will ignore it
+  ;; if it had to and log a message.
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        topic "foo" params {:bar "baz"}]
+    ;; test that notify returns nil so that it can be used
+    ;; as last expression in :fn of RPC methods which expect
+    ;; a json writable object as last expression
+    (is (nil? (plugin/notify topic params plugin)))
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+           {:jsonrpc "2.0" :method topic :params params})))
+  ;; non json writable in :params of the notification we
+  ;; try to send to lightningd.  So we log it
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        topic "foo" params (atom nil)]
+    (plugin/notify topic params plugin)
+    (await (:_resps @plugin))
+    (Thread/sleep 100)
+    (let [outs (str/split (str (:_out @plugin)) #"\n\n")
+          logs (map #(json/read-str % :key-fn keyword) outs)]
+      ;; logs
+      (is (some #(re-find #"Error while sending notification.*:method.*foo"
+                          (get-in % [:params :message]))
+                logs))
+      (is (some #(re-find #"#error" (get-in % [:params :message]))
+                logs))
+      (is (some #(re-find #".*Don't know how to write JSON of class clojure.lang.Atom"
+                          (get-in % [:params :message]))
+                logs)))))
 
 (deftest process-test
   (let [foo-2 (fn [params plugin] {:bar-2 "baz-2"})

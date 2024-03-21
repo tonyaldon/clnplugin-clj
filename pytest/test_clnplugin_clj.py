@@ -35,6 +35,9 @@ def test_getmanifest(node_factory):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_fn_symbol_not_a_function")
     with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
         l1.rpc.plugin_start(plugin)
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_notifications_do_not_declare_log")
+    with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
+        l1.rpc.plugin_start(plugin)
 
 
 def test_init(node_factory):
@@ -191,6 +194,26 @@ def test_log(node_factory):
     assert l1.daemon.is_in_log(r"line 0 - logged by 'log-multi-lines'")
     assert l1.daemon.is_in_log(r"line 1 - logged by 'log-multi-lines'")
     assert l1.daemon.is_in_log(r"line 2 - logged by 'log-multi-lines'")
+
+
+def test_notifications(node_factory):
+    plugins = [os.path.join(os.getcwd(), "pytest/plugins/subscribe.py"),
+               os.path.join(os.getcwd(), "pytest/plugins/notifications")]
+    l1 = node_factory.get_node(options={"plugin": plugins})
+
+    l1.rpc.call("notify-topic-0")
+    l1.daemon.wait_for_log(r"Got a topic-0 notification.*{.*foo-0.*: .*bar-0.*} from plugin notifications")
+    l1.rpc.call("notify-topic-1")
+    l1.daemon.wait_for_log(r"Got a topic-1 notification.*topic-1 params.* from plugin notifications")
+
+    l1.rpc.call("notify-topic-undeclared")
+    l1.daemon.wait_for_log(r"Plugin attempted to send a notification to topic.*topic-undeclared.*not forwarding")
+    time.sleep(1)
+    assert not l1.daemon.is_in_log(r"Got a topic-undeclared notification.*some params.* from plugin notifications")
+
+    l1.rpc.call("notify-topic-1-non-json-writable")
+    assert l1.daemon.is_in_log(r"Error while sending notification.*:method.*topic-1")
+    assert l1.daemon.is_in_log(r":cause.*Don't know how to write JSON of class clojure.lang.Atom")
 
 
 def test_errors(node_factory):

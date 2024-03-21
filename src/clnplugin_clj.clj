@@ -72,6 +72,22 @@
                    (when (:deprecated method) {:deprecated true})))]
     (mapv f (seq rpcmethods))))
 
+(defn gm-notifications
+  "Return the vector of notifications meant to be used in the getmanifest response."
+  [notifications]
+  (when notifications
+    (let [f (fn [topic]
+              (cond
+                (= topic "log")
+                (throw (ex-info "Remove 'log' from :notifications vector.  This is a specific notification that expects a specific params field in the JSON RPC notification.  It is used to log messages in lightningd log file.  To do this use clnplugin-clj/log function." {}))
+                (= topic "message")
+                (throw (ex-info "Remove 'message' from :notifications vector.  This is a specific notification that expects a specific params field in the JSON RPC notification.  It is used to tell lightningd that the response to a JSON RPC request from lightningd is being processed.  To send 'message' notifications use clnplugin-clj/notif-message." {}))
+                (= topic "progress")
+                (throw (ex-info "Remove 'progress' from :notifications vector.  This is a specific notification that expects a specific params field in the JSON RPC notification.  It is used to tell lightningd that the response to a JSON RPC request from lightningd is being processed and to inform about its progress before replying with the actual response.  To send 'progress' notifications use clnplugin-clj/notif-progress." {}))
+                true
+                {:method topic}))]
+      (mapv f notifications))))
+
 (defn gm-resp
   "Return the response to the getmanifest REQ.
 
@@ -98,9 +114,12 @@
   (let [p @plugin]
     {:jsonrpc "2.0"
      :id (:id req)
-     :result {:options (gm-options (:options p))
-              :rpcmethods (gm-rpcmethods (:rpcmethods p))
-              :dynamic (:dynamic p)}}))
+     :result
+     (merge {:options (gm-options (:options p))
+             :rpcmethods (gm-rpcmethods (:rpcmethods p))
+             :dynamic (:dynamic p)}
+            (when-let [notifications (gm-notifications (:notifications p))]
+              {:notifications notifications}))}))
 
 (defn set-defaults!
   "Set default values for :dynamic, :options and :rpcmethods keys if omitted."
@@ -462,6 +481,22 @@
    (let [notifs (map #(vector nil (notif "log" {:level level :message %}))
                      (str/split-lines message))]
      (send (:_resps @plugin) write notifs (:_out @plugin)))
+   nil))
+
+(defn notify
+  "Send a TOPIC notification to lightningd with PARAMS params.
+
+  Except for \"progress\" and \"message\" notifications, TOPIC
+  must be declared to lightningd during the getmanifest round.
+  If this is not the case, lightningd will ignore the notification
+  (not forwarding it to the subscriber) and log something like this:
+
+      Plugin attempted to send a notification to topic ...
+      it hasn't declared in its manifest, not forwarding to subscribers.
+
+  See plugin/gm-resp"
+  ([topic params plugin]
+   (send (:_resps @plugin) write [[nil (notif topic params)]] (:_out @plugin))
    nil))
 
 (defn process
