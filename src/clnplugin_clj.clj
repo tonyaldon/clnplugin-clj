@@ -478,6 +478,7 @@
   ([message plugin]
    (log message "info" plugin))
   ([message level plugin]
+   {:pre [(string? message)]}
    (let [notifs (map #(vector nil (notif "log" {:level level :message %}))
                      (str/split-lines message))]
      (send (:_resps @plugin) write notifs (:_out @plugin)))

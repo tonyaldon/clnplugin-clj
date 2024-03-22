@@ -982,7 +982,13 @@
                (json/read pbr :key-fn keyword)))
            '({:jsonrpc "2.0", :method "log", :params {:level "info", :message "foo-1"}}
              {:jsonrpc "2.0", :method "log", :params {:level "info", :message "foo-2"}}
-             {:jsonrpc "2.0", :method "log", :params {:level "info", :message "foo-3"}})))))
+             {:jsonrpc "2.0", :method "log", :params {:level "info", :message "foo-3"}}))))
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        message 'not-a-string]
+    (is (thrown-with-msg?
+         Throwable
+         #"Assert failed: \(string\? message\)"
+         (plugin/log message plugin)))))
 
 (deftest notify-test
   ;; In these tests, we don't specify :notifications in plugin,
