@@ -541,31 +541,20 @@
   Writes to :_out of PLUGIN are synchronized with :_resps agent and
   clnplugin-clj/write action function."
   [req plugin]
-  (go
-    (let [method (keyword (:method req))
-          method-fn (get-in (:rpcmethods @plugin) [method :fn])
-          result-or-error
-          (try
-            {:result (method-fn (:params req) req plugin)}
-            (catch clojure.lang.ExceptionInfo e
-              (let [msg (format "Error while processing '%s'" req)
-                    error (merge {:code -32603 :message msg}
-                                 (:error (ex-data e)))]
-                (log msg "debug" plugin)
-                (log (format "%s" error) "debug" plugin)
-                {:error error}))
-            (catch Throwable e
-              (let [msg (format "Error while processing '%s'" req)]
-                (log msg "debug" plugin)
-                (log (exception e) "debug" plugin)
-                {:error {:code -32603
-                         :message msg
-                         :exception (exception e)}})))
-          resp (merge {:jsonrpc "2.0" :id (:id req)}
-                      result-or-error)
-          out (:_out @plugin)
-          resps (:_resps @plugin)]
-      (send resps write [[req resp]] out))))
+  (let [req-id (:id req)
+        method (keyword (:method req))
+        method-fn (get-in (:rpcmethods @plugin) [method :fn])
+        msg (format "Error while processing '%s'" req)
+        jsonrpc {:jsonrpc "2.0" :id req-id}]
+    (try
+      ;; nil because nothing to log
+      [nil (merge jsonrpc {:result (method-fn (:params req) req plugin)})]
+      (catch clojure.lang.ExceptionInfo e
+        (let [error (merge {:code -32603 :message msg} (:error (ex-data e)))]
+          [[msg (format "%s" error)] (merge jsonrpc {:error error})]))
+      (catch Throwable e
+        [[msg (exception e)]
+         (merge jsonrpc {:error {:code -32603 :message msg :exception (exception e)}})]))))
 
 (defn read
   "Read a CLN JSON-RPC request from IN.
@@ -595,5 +584,8 @@
   (swap! plugin assoc :_resps (agent nil))
   (loop [req (read *in*)]
     (when req
-      (process req plugin)
+      (go
+        (let [[logs resp] (process req plugin)]
+          (doseq [msg logs] (log msg "debug" plugin))
+          (send (:_resps @plugin) write [[req resp]] (:_out @plugin))))
       (recur (read *in*)))))

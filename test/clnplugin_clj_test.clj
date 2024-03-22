@@ -1112,37 +1112,19 @@
                                      {})}
                        :foo-5 {:fn (fn [params req plugin]
                                      {:bar-5 (loop [bar-4 nil]
-                                               (or bar-4 (recur (:bar-4 @plugin))))})}}
-                      :_out (new java.io.StringWriter)
-                      :_resps (agent nil)})
+                                               (or bar-4 (recur (:bar-4 @plugin))))})}}})
         req-0 {:jsonrpc "2.0" :id "id-0" :method "foo-0" :params {}}
         req-1 {:jsonrpc "2.0" :id "id-1" :method "foo-1" :params {:baz-1 "baz-1"}}
         req-2 {:jsonrpc "2.0" :id "id-2" :method "foo-2" :params {}}
         req-3 {:jsonrpc "2.0" :id "id-3" :method "foo-3" :params {}}
         req-4 {:jsonrpc "2.0" :id "id-4" :method "foo-4" :params {}}
         req-5 {:jsonrpc "2.0" :id "id-5" :method "foo-5" :params {}}]
-    (plugin/process req-0 plugin)
-    (Thread/sleep 100) ;; because `plugin/process` calls are asynchronous (in go blocks)
-    (plugin/process req-1 plugin)
-    (Thread/sleep 100)
-    (plugin/process req-2 plugin)
-    (Thread/sleep 100)
-    (plugin/process req-3 plugin)
-    (Thread/sleep 100)
-    (plugin/process req-4 plugin)
-    (Thread/sleep 100)
-    (plugin/process req-5 plugin)
-    (await (:_resps @plugin))
-    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
-          resps (map #(json/read-str % :key-fn keyword) outs)]
-      (is (= resps
-             '({:jsonrpc "2.0" :id "id-0" :result {:bar "baz"}}
-               {:jsonrpc "2.0" :id "id-1" :result {:bar-1 "baz-1"}}
-               {:jsonrpc "2.0" :id "id-2" :result {:bar-2 "baz-2"}}
-               {:jsonrpc "2.0" :id "id-3" :result {:bar-3 "id-3"}}
-               {:jsonrpc "2.0" :id "id-4" :result {}}
-               {:jsonrpc "2.0" :id "id-5" :result {:bar-5 "baz-4"}})))))
+    (is (= (second (plugin/process req-0 plugin)) {:jsonrpc "2.0" :id "id-0" :result {:bar "baz"}}))
+    (is (= (second (plugin/process req-1 plugin)) {:jsonrpc "2.0" :id "id-1" :result {:bar-1 "baz-1"}}))
+    (is (= (second (plugin/process req-2 plugin)) {:jsonrpc "2.0" :id "id-2" :result {:bar-2 "baz-2"}}))
+    (is (= (second (plugin/process req-3 plugin)) {:jsonrpc "2.0" :id "id-3" :result {:bar-3 "id-3"}}))
+    (is (= (second (plugin/process req-4 plugin)) {:jsonrpc "2.0" :id "id-4" :result {}}))
+    (is (= (second (plugin/process req-5 plugin)) {:jsonrpc "2.0" :id "id-5" :result {:bar-5 "baz-4"}})))
 
   ;; Custom errors raised by user
   (let [plugin (atom {:rpcmethods
@@ -1151,27 +1133,13 @@
                               (throw
                                (let [msg "custom-error"]
                                  (ex-info msg {:error
-                                               {:code -100 :message msg}}))))}}
-                      :_out (new java.io.StringWriter)
-                      :_resps (agent nil)})
+                                               {:code -100 :message msg}}))))}}})
         req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
-    (plugin/process req plugin)
-    (await (:_resps @plugin))
-    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
-          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
-          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
-      (is (= resp
-             {:jsonrpc "2.0"
-              :id "some-id"
-              :error
-              {:code -100 :message "custom-error"}}))
-      (is (some #(re-find #"Error while processing.*method.*custom-error"
-                          (get-in % [:params :message]))
-                resp-and-logs))
-      (is (some #(re-find #"code.*-100.*message.*custom-error"
-                          (get-in % [:params :message]))
-                resp-and-logs))))
+    (let [[logs resp] (plugin/process req plugin)]
+      (is (= resp {:jsonrpc "2.0" :id "some-id"
+                   :error {:code -100 :message "custom-error"}}))
+      (is (re-find #"Error while processing.*method.*custom-error" (first logs)))
+      (is (re-find #"code.*-100.*message.*custom-error" (second logs)))))
 
   ;; missing :code key in the error thrown by :fn
   ;; so it is set to -32603
@@ -1180,21 +1148,11 @@
                        {:fn (fn [params req plugin]
                               (throw
                                (let [msg "custom-error"]
-                                 (ex-info msg {:error {:message msg}}))))}}
-                      :_out (new java.io.StringWriter)
-                      :_resps (agent nil)})
+                                 (ex-info msg {:error {:message msg}}))))}}})
         req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
-    (plugin/process req plugin)
-    (await (:_resps @plugin))
-    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
-          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
-          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
-      (is (= resp
-             {:jsonrpc "2.0"
-              :id "some-id"
-              :error
-              {:code -32603 :message "custom-error"}}))))
+    (let [[logs resp] (plugin/process req plugin)]
+      (is (= resp {:jsonrpc "2.0" :id "some-id"
+                   :error {:code -32603 :message "custom-error"}}))))
 
   ;; missing :message key in the error thrown by :fn
   (let [plugin (atom {:rpcmethods
@@ -1205,12 +1163,7 @@
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
         req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
-    (plugin/process req plugin)
-    (await (:_resps @plugin))
-    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
-          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
-          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+    (let [[logs resp] (plugin/process req plugin)]
       (is (= (get-in resp [:error :code]) -100))
       (is (re-find #"Error while processing.*method.*custom-error"
                    (get-in resp [:error :message])))))
@@ -1224,12 +1177,7 @@
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
         req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
-    (plugin/process req plugin)
-    (await (:_resps @plugin))
-    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
-          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
-          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+    (let [[logs resp] (plugin/process req plugin)]
       (is (= (get-in resp [:error :code]) -32603))
       (is (re-find #"Error while processing.*method.*custom-error"
                    (get-in resp [:error :message])))))
@@ -1237,148 +1185,32 @@
   ;; Execution errors
   (let [plugin (atom {:rpcmethods
                       {:execution-error
-                       {:fn (fn [params req plugin] (/ 1 0))}}
-                      :_out (new java.io.StringWriter)
-                      :_resps (agent nil)})
+                       {:fn (fn [params req plugin] (/ 1 0))}}})
         req {:jsonrpc "2.0" :id "some-id" :method "execution-error" :params {}}]
-    (plugin/process req plugin)
-    (await (:_resps @plugin))
-    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
-          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
-          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+    (let [[logs resp] (plugin/process req plugin)]
       (is (= (get-in resp [:error :code]) -32603))
       (is (re-find #"Error while processing.*method.*execution-error"
                    (get-in resp [:error :message])))
       (is (re-find
            #"(?s)#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
            (get-in resp [:error :exception])))
-      (is (some #(re-find #"Error while processing.*method.*execution-error"
-                          (get-in % [:params :message]))
-                resp-and-logs))
-      (is (some #(= % {:jsonrpc "2.0"
-                       :method "log"
-                       :params {:level "debug"
-                                :message " :cause \"Divide by zero\""}})
-                resp-and-logs))))
+      (is (re-find #"Error while processing.*method.*execution-error" (first logs)))
+      (is (re-find #" :cause \"Divide by zero\"" (second logs)))))
 
   ;; AssertionError
   (let [plugin (atom {:rpcmethods
                       {:assertion-error
-                       {:fn (fn [params req plugin]
-                              (assert (< 0 -1)))}}
-                      :_out (new java.io.StringWriter)
-                      :_resps (agent nil)})
+                       {:fn (fn [params req plugin] (assert (< 0 -1)))}}})
         req {:jsonrpc "2.0" :id "some-id" :method "assertion-error" :params {}}]
-    (plugin/process req plugin)
-    (await (:_resps @plugin))
-    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
-          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
-          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+    (let [[logs resp] (plugin/process req plugin)]
       (is (= (get-in resp [:error :code]) -32603))
       (is (re-find #"Error while processing.*method.*assertion-error"
                    (get-in resp [:error :message])))
       (is (re-find
            #"(?s)#error.*:cause.*Assert failed: \(< 0 -1\)"
            (get-in resp [:error :exception])))
-      (is (some #(re-find #"Error while processing.*method.*assertion-error"
-                          (get-in % [:params :message]))
-                resp-and-logs))
-      (is (some #(= % {:jsonrpc "2.0"
-                       :method "log"
-                       :params {:level "debug"
-                                :message " :cause \"Assert failed: (< 0 -1)\""}})
-                resp-and-logs))))
-
-  ;; Handle non json writable in :result and :error of responses
-  ;; to requests we try to send to lightningd
-  ;;
-  ;; json rpc result with non json writable
-  (let [plugin (atom {:rpcmethods
-                      {:non-json-writable-in-result
-                       {:fn (fn [params req plugin]
-                              ;; `swap!` returns new value of plugin
-                              ;; which contains :_out and :_resps (non
-                              ;; json writable) and as it is the last
-                              ;; expression in function body, clnplugin-clj
-                              ;; will try to use it as :result value in
-                              ;; the json response to lightningd.
-                              ;; Fortunately, we catch that Exception
-                              ;; and return an json rpc error to lightningd.
-                              (swap! plugin assoc :bar "baz"))}}
-                      :_out (new java.io.StringWriter)
-                      :_resps (agent nil)})
-        req {:jsonrpc "2.0" :id "some-id" :method "non-json-writable-in-result" :params {}}]
-    (plugin/process req plugin)
-    (await (:_resps @plugin))
-    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [outs (str/split (str (:_out @plugin)) #"\n\n")
-          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
-          err (some #(when (= (:id %) "some-id") %) resp-and-logs)]
-      ;; error
-      (is (re-find
-           #"Error while processing.*:method.*non-json-writable-in-result"
-           (get-in err [:error :message])))
-      (is (re-find
-           #"(?s)#error.*Don't know how to write JSON of class"
-           (get-in err [:error :exception])))
-      (is (= (get-in err [:error :request])
-             req))
-      ;; because `swap!` in non-json-writable-in-result method definition returns new value of plugin atom
-      (let [result (get-in err [:error :response :result])]
-        (is (and (contains? result :rpcmethods)
-                 (contains? result :_out)
-                 (contains? result :_resps))))
-      ;; logs
-      (is (some #(re-find #"Error while processing.*:method.*non-json-writable-in-result"
-                          (get-in % [:params :message]))
-                resp-and-logs))
-      (is (some #(re-find #"#error" (get-in % [:params :message]))
-                resp-and-logs))
-      (is (some #(re-find #".*Don't know how to write JSON of class"
-                          (get-in % [:params :message]))
-                resp-and-logs))))
-
-  ;; json rpc error with non json writable
-  (let [plugin (atom {:rpcmethods
-                      {:non-json-writable-in-error
-                       {:fn (fn [params req plugin]
-                              (throw
-                               ;; atom as :message value is not json writable
-                               (ex-info "non-json-writable-in-error"
-                                        {:error
-                                         {:code -100 :message (atom nil)}})))}}
-                      :_out (new java.io.StringWriter)
-                      :_resps (agent nil)})
-        req {:jsonrpc "2.0" :id "some-id" :method "non-json-writable-in-error" :params {}}]
-    (plugin/process req plugin)
-    (await (:_resps @plugin))
-    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
-    (let [outs (str/split (str (:_out @plugin)) #"\n\n")
-          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
-          err (some #(when (= (:id %) "some-id") %) resp-and-logs)]
-      ;; error
-      (is (re-find
-           #"Error while processing.*:method.*non-json-writable-in-error"
-           (get-in err [:error :message])))
-      (is (re-find
-           #"(?s)#error.*Don't know how to write JSON of class"
-           (get-in err [:error :exception])))
-      (is (= (get-in err [:error :request])
-             req))
-      (is (re-find
-           #"#object\[clojure.lang.Atom .*\]"
-           (get-in err [:error :response :error :message])))
-      ;; logs
-      (is (some #(re-find #"Error while processing.*:method.*non-json-writable-in-error"
-                          (get-in % [:params :message]))
-                resp-and-logs))
-      (is (some #(re-find #"#error" (get-in % [:params :message]))
-                resp-and-logs))
-      (is (some #(re-find #".*Don't know how to write JSON of class clojure.lang.Atom"
-                          (get-in % [:params :message]))
-                resp-and-logs)))))
+      (is (re-find #"Error while processing.*method.*assertion-error" (first logs)))
+      (is (re-find #" :cause \"Assert failed: \(< 0 -1\)\"" (second logs))))))
 
 (deftest read-test
   (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}
