@@ -10,11 +10,10 @@
     (-> (rpc/getinfo rpc-info)
         (json/write *out* :escape-slash false))))
 
-(defn call-send-message-notifications-with-enable-notifications
+(defn call-send-message-notifications
   [{:keys [socket-file]}]
   (let [notifs (chan)
-        rpc-info {:socket-file socket-file
-                  :notifs notifs}
+        rpc-info {:socket-file socket-file :notifs notifs}
         resp (go (rpc/call rpc-info "send-message-notifications"))
         notifs-and-resp (atom [])]
     (loop [notif (<!! notifs)]

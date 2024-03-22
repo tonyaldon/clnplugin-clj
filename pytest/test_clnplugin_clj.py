@@ -224,10 +224,10 @@ def test_notifications_message_progress(node_factory):
 
     os.chdir("pytest/plugins")
 
-    # Call send-message-notifications defined in notifications_message_progress plugin.
+    # Call send-message-notifications defined in notifications_message_progress.clj plugin.
     # Accumulate in an vector the 3 notifications queued in a channel
     # and the response at the end
-    cmd = f"clojure -X rpc/call-send-message-notifications-with-enable-notifications :socket-file '\"{l1_socket_file}\"'"
+    cmd = f"clojure -X rpc/call-send-message-notifications :socket-file '\"{l1_socket_file}\"'"
     cmd_str = os.popen(cmd).read()
     assert json.loads(cmd_str) == ["foo","bar","baz",{"foo":"bar"}]
 
