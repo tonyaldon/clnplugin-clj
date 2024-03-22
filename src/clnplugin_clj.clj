@@ -585,7 +585,7 @@
   (loop [req (read *in*)]
     (when req
       (go
-        (let [[logs resp] (process req plugin)]
-          (doseq [msg logs] (log msg "debug" plugin))
+        (let [[log-msgs resp] (process req plugin)]
+          (doseq [msg log-msgs] (log msg "debug" plugin))
           (send (:_resps @plugin) write [[req resp]] (:_out @plugin))))
       (recur (read *in*)))))

@@ -1135,11 +1135,11 @@
                                  (ex-info msg {:error
                                                {:code -100 :message msg}}))))}}})
         req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
-    (let [[logs resp] (plugin/process req plugin)]
+    (let [[log-msgs resp] (plugin/process req plugin)]
       (is (= resp {:jsonrpc "2.0" :id "some-id"
                    :error {:code -100 :message "custom-error"}}))
-      (is (re-find #"Error while processing.*method.*custom-error" (first logs)))
-      (is (re-find #"code.*-100.*message.*custom-error" (second logs)))))
+      (is (re-find #"Error while processing.*method.*custom-error" (first log-msgs)))
+      (is (re-find #"code.*-100.*message.*custom-error" (second log-msgs)))))
 
   ;; missing :code key in the error thrown by :fn
   ;; so it is set to -32603
@@ -1150,7 +1150,7 @@
                                (let [msg "custom-error"]
                                  (ex-info msg {:error {:message msg}}))))}}})
         req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
-    (let [[logs resp] (plugin/process req plugin)]
+    (let [[log-msgs resp] (plugin/process req plugin)]
       (is (= resp {:jsonrpc "2.0" :id "some-id"
                    :error {:code -32603 :message "custom-error"}}))))
 
@@ -1163,7 +1163,7 @@
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
         req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
-    (let [[logs resp] (plugin/process req plugin)]
+    (let [[log-msgs resp] (plugin/process req plugin)]
       (is (= (get-in resp [:error :code]) -100))
       (is (re-find #"Error while processing.*method.*custom-error"
                    (get-in resp [:error :message])))))
@@ -1177,7 +1177,7 @@
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
         req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
-    (let [[logs resp] (plugin/process req plugin)]
+    (let [[log-msgs resp] (plugin/process req plugin)]
       (is (= (get-in resp [:error :code]) -32603))
       (is (re-find #"Error while processing.*method.*custom-error"
                    (get-in resp [:error :message])))))
@@ -1187,30 +1187,30 @@
                       {:execution-error
                        {:fn (fn [params req plugin] (/ 1 0))}}})
         req {:jsonrpc "2.0" :id "some-id" :method "execution-error" :params {}}]
-    (let [[logs resp] (plugin/process req plugin)]
+    (let [[log-msgs resp] (plugin/process req plugin)]
       (is (= (get-in resp [:error :code]) -32603))
       (is (re-find #"Error while processing.*method.*execution-error"
                    (get-in resp [:error :message])))
       (is (re-find
            #"(?s)#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
            (get-in resp [:error :exception])))
-      (is (re-find #"Error while processing.*method.*execution-error" (first logs)))
-      (is (re-find #" :cause \"Divide by zero\"" (second logs)))))
+      (is (re-find #"Error while processing.*method.*execution-error" (first log-msgs)))
+      (is (re-find #" :cause \"Divide by zero\"" (second log-msgs)))))
 
   ;; AssertionError
   (let [plugin (atom {:rpcmethods
                       {:assertion-error
                        {:fn (fn [params req plugin] (assert (< 0 -1)))}}})
         req {:jsonrpc "2.0" :id "some-id" :method "assertion-error" :params {}}]
-    (let [[logs resp] (plugin/process req plugin)]
+    (let [[log-msgs resp] (plugin/process req plugin)]
       (is (= (get-in resp [:error :code]) -32603))
       (is (re-find #"Error while processing.*method.*assertion-error"
                    (get-in resp [:error :message])))
       (is (re-find
            #"(?s)#error.*:cause.*Assert failed: \(< 0 -1\)"
            (get-in resp [:error :exception])))
-      (is (re-find #"Error while processing.*method.*assertion-error" (first logs)))
-      (is (re-find #" :cause \"Assert failed: \(< 0 -1\)\"" (second logs))))))
+      (is (re-find #"Error while processing.*method.*assertion-error" (first log-msgs)))
+      (is (re-find #" :cause \"Assert failed: \(< 0 -1\)\"" (second log-msgs))))))
 
 (deftest read-test
   (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}
