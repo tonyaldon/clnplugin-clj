@@ -1025,6 +1025,37 @@
                           (get-in % [:params :message]))
                 logs)))))
 
+(deftest notify-message-test
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        message "foo"
+        req {:id 16}]
+    (is (nil? (plugin/notify-message message req plugin)))
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+           {:jsonrpc "2.0"
+            :method "message"
+            :params {:id 16 :level "info" :message "foo"}})))
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        message "foo"
+        level "debug"
+        req {:id 16}]
+    (is (nil? (plugin/notify-message message level req plugin)))
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+           {:jsonrpc "2.0"
+            :method "message"
+            :params {:id 16 :level "debug" :message "foo"}})))
+  ;; error if message is not a string
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        message 'not-a-string
+        req {:id 16}]
+    (is (thrown-with-msg?
+         Throwable
+         #"Assert failed: \(string\? message\)"
+         (plugin/notify-message message req plugin)))))
+
 (deftest process-test
   (let [foo-2 (fn [params req plugin] {:bar-2 "baz-2"})
         plugin (atom {:rpcmethods

@@ -500,6 +500,14 @@
    (send (:_resps @plugin) write [[nil (notif topic params)]] (:_out @plugin))
    nil))
 
+(defn notify-message
+  "..."
+  ([message req plugin]
+   (notify-message message "info" req plugin))
+  ([message level req plugin]
+   {:pre [(string? message)]}
+   (notify "message" {:id (:id req) :message message :level level} plugin)))
+
 (defn process
   "Process REQ.
 

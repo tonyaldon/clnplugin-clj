@@ -1,3 +1,7 @@
 {:deps
- {clnrpc-clj/clnrpc-clj {:local/root "../.."}}
- }
+ {clnplugin-clj/clnplugin-clj {:local/root "../.."}
+  ;; need to change this when clnrpc-clj is public on github
+  clnrpc-clj/clnrpc-clj {:local/root "../../../clnrpc-clj"}
+  org.clojure/data.json {:mvn/version "2.5.0"}
+  org.clojure/core.async {:mvn/version "1.6.681"}
+  }}

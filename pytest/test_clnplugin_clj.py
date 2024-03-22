@@ -216,6 +216,21 @@ def test_notifications(node_factory):
     assert l1.daemon.is_in_log(r":cause.*Don't know how to write JSON of class clojure.lang.Atom")
 
 
+def test_notifications_message_progress(node_factory):
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/notifications_message_progress")
+    l1 = node_factory.get_node(options={"plugin": plugin})
+    l1_info = l1.rpc.getinfo()
+    l1_socket_file = os.path.join(l1_info["lightning-dir"], "lightning-rpc")
+
+    os.chdir("pytest/plugins")
+
+    # Call send-message-notifications defined in notifications_message_progress plugin.
+    # Accumulate in an vector the 3 notifications queued in a channel
+    # and the response at the end
+    cmd = f"clojure -X rpc/call-send-message-notifications-with-enable-notifications :socket-file '\"{l1_socket_file}\"'"
+    cmd_str = os.popen(cmd).read()
+    assert json.loads(cmd_str) == ["foo","bar","baz",{"foo":"bar"}]
+
 def test_errors(node_factory):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/errors")
     l1 = node_factory.get_node(options={"plugin": plugin})
