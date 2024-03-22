@@ -540,7 +540,7 @@
                 (log msg "debug" plugin)
                 (log (format "%s" error) "debug" plugin)
                 {:error error}))
-            (catch Exception e
+            (catch Throwable e
               (let [msg (format "Error while processing '%s'" req)]
                 (log msg "debug" plugin)
                 (log (exception e) "debug" plugin)

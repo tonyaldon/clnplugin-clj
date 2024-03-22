@@ -1151,6 +1151,7 @@
               :id "some-id"
               :error
               {:code -32603 :message "custom-error"}}))))
+
   ;; missing :message key in the error thrown by :fn
   (let [plugin (atom {:rpcmethods
                       {:custom-error
@@ -1169,6 +1170,7 @@
       (is (= (get-in resp [:error :code]) -100))
       (is (re-find #"Error while processing.*method.*custom-error"
                    (get-in resp [:error :message])))))
+
   ;; empty data in the error thrown by :fn
   (let [plugin (atom {:rpcmethods
                       {:custom-error
@@ -1187,6 +1189,7 @@
       (is (= (get-in resp [:error :code]) -32603))
       (is (re-find #"Error while processing.*method.*custom-error"
                    (get-in resp [:error :message])))))
+
   ;; Execution errors
   (let [plugin (atom {:rpcmethods
                       {:execution-error
@@ -1213,6 +1216,35 @@
                        :method "log"
                        :params {:level "debug"
                                 :message " :cause \"Divide by zero\""}})
+                resp-and-logs))))
+
+  ;; AssertionError
+  (let [plugin (atom {:rpcmethods
+                      {:assertion-error
+                       {:fn (fn [params req plugin]
+                              (assert (< 0 -1)))}}
+                      :_out (new java.io.StringWriter)
+                      :_resps (agent nil)})
+        req {:jsonrpc "2.0" :id "some-id" :method "assertion-error" :params {}}]
+    (plugin/process req plugin)
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
+    (let [outs (-> (:_out @plugin) str (str/split #"\n\n"))
+          resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
+          resp (some #(when (= (:id %) "some-id") %) resp-and-logs)]
+      (is (= (get-in resp [:error :code]) -32603))
+      (is (re-find #"Error while processing.*method.*assertion-error"
+                   (get-in resp [:error :message])))
+      (is (re-find
+           #"(?s)#error.*:cause.*Assert failed: \(< 0 -1\)"
+           (get-in resp [:error :exception])))
+      (is (some #(re-find #"Error while processing.*method.*assertion-error"
+                          (get-in % [:params :message]))
+                resp-and-logs))
+      (is (some #(= % {:jsonrpc "2.0"
+                       :method "log"
+                       :params {:level "debug"
+                                :message " :cause \"Assert failed: (< 0 -1)\""}})
                 resp-and-logs))))
 
   ;; Handle non json writable in :result and :error of responses
@@ -1263,6 +1295,7 @@
       (is (some #(re-find #".*Don't know how to write JSON of class"
                           (get-in % [:params :message]))
                 resp-and-logs))))
+
   ;; json rpc error with non json writable
   (let [plugin (atom {:rpcmethods
                       {:non-json-writable-in-error
@@ -1293,7 +1326,7 @@
       (is (re-find
            #"#object\[clojure.lang.Atom .*\]"
            (get-in err [:error :response :error :message])))
-      ;; ;; logs
+      ;; logs
       (is (some #(re-find #"Error while processing.*:method.*non-json-writable-in-error"
                           (get-in % [:params :message]))
                 resp-and-logs))
