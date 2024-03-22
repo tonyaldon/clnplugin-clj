@@ -508,6 +508,20 @@
    {:pre [(string? message)]}
    (notify "message" {:id (:id req) :message message :level level} plugin)))
 
+(defn notify-progress
+  "..."
+  ([step total-steps req plugin]
+   (notify-progress step total-steps nil nil req plugin))
+  ([step total-steps stage total-stages req plugin]
+   {:pre [(and (int? step) (int? total-steps) (< step total-steps))
+          (or (nil? stage) (nil? total-stages)
+              (and (int? stage) (int? total-stages) (< stage total-stages)))]}
+   (let [params
+         (merge {:id (:id req) :num step :total total-steps}
+                (when (and stage total-stages)
+                  {:stage {:num stage :total total-stages}}))]
+     (notify "progress" params plugin))))
+
 (defn process
   "Process REQ.
 

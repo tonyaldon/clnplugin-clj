@@ -231,6 +231,37 @@ def test_notifications_message_progress(node_factory):
     cmd_str = os.popen(cmd).read()
     assert json.loads(cmd_str) == ["foo","bar","baz",{"foo":"bar"}]
 
+
+    # Call send-progress-notifications defined in notifications_message_progress.clj plugin.
+    # Accumulate in an vector the 3 notifications queued in a channel
+    # and the response at the end
+    cmd = f"clojure -X rpc/call-send-progress-notifications :socket-file '\"{l1_socket_file}\"'"
+    cmd_str = os.popen(cmd).read()
+    # assert json.loads(cmd_str) == [0,1,2,{"foo":"bar"}]
+    assert json.loads(cmd_str) == [{"num": 0, "total": 3},
+                                   {"num": 1, "total": 3},
+                                   {"num": 2, "total": 3},
+                                   {"foo":"bar"}]
+
+    # Call send-progress-notifications-with-stages defined in notifications_message_progress.clj plugin.
+    # Accumulate in an vector the 6 notifications queued in a channel
+    # and the response at the end
+    cmd = f"clojure -X rpc/call-send-progress-notifications :with-stages? 'true' :socket-file '\"{l1_socket_file}\"'"
+    cmd_str = os.popen(cmd).read()
+    assert json.loads(cmd_str) == [{"num": 0, "total": 2, "stage": {"num": 0, "total": 3}},
+                                   {"num": 1, "total": 2, "stage": {"num": 0, "total": 3}},
+                                   {"num": 0, "total": 2, "stage": {"num": 1, "total": 3}},
+                                   {"num": 1, "total": 2, "stage": {"num": 1, "total": 3}},
+                                   {"num": 0, "total": 2, "stage": {"num": 2, "total": 3}},
+                                   {"num": 1, "total": 2, "stage": {"num": 2, "total": 3}},
+                                   {"foo":"bar"}]
+
+    with pytest.raises(RpcError, match=r"Error while processing.*method.*wrong-args-in-notify-progress"):
+        l1.rpc.call("wrong-args-in-notify-progress")
+    assert l1.daemon.is_in_log(r"Error while processing.*method.*wrong-args-in-notify-progress")
+    assert l1.daemon.is_in_log(r":cause.*Assert failed:")
+
+
 def test_errors(node_factory):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/errors")
     l1 = node_factory.get_node(options={"plugin": plugin})

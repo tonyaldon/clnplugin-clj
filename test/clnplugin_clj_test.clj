@@ -1056,6 +1056,50 @@
          #"Assert failed: \(string\? message\)"
          (plugin/notify-message message req plugin)))))
 
+(deftest notify-progress-test
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        step 0
+        total-steps 3
+        req {:id 16}]
+    (is (nil? (plugin/notify-progress step total-steps req plugin)))
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+           {:jsonrpc "2.0"
+            :method "progress"
+            :params {:id 16 :num 0 :total 3}})))
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        step 1 total-steps 3
+        stage 1 total-stages 5
+        req {:id 16}]
+    (is (nil? (plugin/notify-progress step total-steps stage total-stages req plugin)))
+    (await (:_resps @plugin))
+    (Thread/sleep 100) ;; if we don't wait, :_out would be empty
+    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+           {:jsonrpc "2.0"
+            :method "progress"
+            :params {:id 16 :num 1 :total 3
+                     :stage {:num 1 :total 5}}})))
+  ;; error: step must be < to total-steps
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        step 3
+        total-steps 3
+        req {:id 16}]
+    (is (thrown-with-msg?
+         Throwable
+         #"Assert failed"
+         (plugin/notify-progress step total-steps req plugin)))
+    )
+  ;; error: stage must be < to total-stages
+  (let [plugin (atom {:_resps (agent nil) :_out (new java.io.StringWriter)})
+        step 1 total-steps 3
+        stage 3 total-stages 3
+        req {:id 16}]
+    (is (thrown-with-msg?
+         Throwable
+         #"Assert failed"
+         (plugin/notify-progress step total-steps stage total-stages req plugin)))))
+
 (deftest process-test
   (let [foo-2 (fn [params req plugin] {:bar-2 "baz-2"})
         plugin (atom {:rpcmethods

@@ -24,17 +24,18 @@
           (recur (<!! notifs)))))
     (json/write @notifs-and-resp *out* :escape-slash false)))
 
-(defn call-send-progress-notifications-with-enable-notifications
-  [{:keys [socket-file]}]
+(defn call-send-progress-notifications
+  [{:keys [socket-file with-stages?]}]
   (let [notifs (chan)
-        rpc-info {:socket-file socket-file
-                  :notifs notifs}
-        resp (go (rpc/call rpc-info "send-progress-notifications"))
+        rpc-info {:socket-file socket-file :notifs notifs}
+        resp (go (if with-stages?
+                   (rpc/call rpc-info "send-progress-notifications-with-stages")
+                   (rpc/call rpc-info "send-progress-notifications")))
         notifs-and-resp (atom [])]
     (loop [notif (<!! notifs)]
       (if (= notif :no-more)
         (swap! notifs-and-resp conj (<!! resp))
         (do
-          (swap! notifs-and-resp conj (get-in notif [:params :num]))
+          (swap! notifs-and-resp conj (dissoc (:params notif) :id))
           (recur (<!! notifs)))))
     (json/write @notifs-and-resp *out* :escape-slash false)))
