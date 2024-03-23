@@ -6,6 +6,6 @@ cljtest:
 	clojure -X:test
 
 pytest:
-	pytest -n auto pytest
+	pytest -n 6 pytest
 
 test: cljtest pytest
