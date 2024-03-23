@@ -12,8 +12,7 @@
                         (swap! plugin assoc :bar-3 "baz-3")
                         {})}
           :foo-4 {:fn (fn [params req plugin]
-                        {:bar-4 (loop [bar-3 nil]
-                                  (or bar-3 (recur (:bar-3 @plugin))))})}
+                        {:bar-4 (:bar-3 @plugin)})}
           :foo-deprecated {:fn (fn [params req plugin] {:bar "baz"})
                            :deprecated true}}}))
 

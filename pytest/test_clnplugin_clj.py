@@ -12,6 +12,7 @@ def test_rpcmethods(node_factory):
     # foo-3 must be call before foo-4 because it sets a value in plugin atom
     # that we want to get with foo-4
     assert l1.rpc.call("foo-3") == {}
+    time.sleep(0.1)
     assert l1.rpc.call("foo-4") == {"bar-4": "baz-3"}
 
     l2 = node_factory.get_node(options={'allow-deprecated-apis': False})
