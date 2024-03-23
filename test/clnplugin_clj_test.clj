@@ -841,16 +841,6 @@
            #"(?s):check-opt of ':foo' option thrown the following exception when called with 'foo-value' value:.*#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
            (get-in (ex-data e) [:error :message]))))))
 
-(deftest add-rpcmethod!-test
-  (let [plugin (atom {:rpcmethods {}})
-        foo-fn (fn [params req plugin] {:bar "baz"})]
-    (plugin/add-rpcmethod! :foo foo-fn plugin)
-    (is (= (get-in @plugin [:rpcmethods :foo :fn])
-           foo-fn))
-    (plugin/add-rpcmethod! :setconfig plugin/setconfig! plugin)
-    (is (= (get-in @plugin [:rpcmethods :setconfig :fn])
-           plugin/setconfig!))))
-
 (deftest notif-test
   (let [method "foo" params {:bar "baz"}]
     (is (= (plugin/notif method params)
@@ -1245,3 +1235,15 @@
     (catch clojure.lang.ExceptionInfo e
       (is (= (ex-data e)
              {:error {:code -32700 :message "Invalid token in json input: 'foo'"}})))))
+
+(deftest max-parallel-reqs-test
+  (let [plugin-0 (atom {})
+        plugin-1 (atom {:max-parallel-reqs -12})
+        plugin-2 (atom {:max-parallel-reqs 32})
+        plugin-3 (atom {:max-parallel-reqs 2048})
+        plugin-4 (atom {:max-parallel-reqs 'not-an-int})]
+    (is (= (plugin/max-parallel-reqs plugin-0) 512))
+    (is (= (plugin/max-parallel-reqs plugin-1) 1))
+    (is (= (plugin/max-parallel-reqs plugin-2) 32))
+    (is (= (plugin/max-parallel-reqs plugin-3) 1023))
+    (is (= (plugin/max-parallel-reqs plugin-4) 512))))

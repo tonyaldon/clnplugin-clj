@@ -3,7 +3,7 @@
   (:refer-clojure :exclude [read])
   (:require [clojure.string :as str])
   (:require [clojure.data.json :as json])
-  (:require [clojure.core.async :refer [go]]))
+  (:require [clojure.core.async :refer [go >!! <!! chan thread]]))
 
 (defn gm-option
   "Check option and return it in a format understable by lightningd.
@@ -328,20 +328,6 @@
     (set-option! [kw-opt value] plugin)
     {}))
 
-(defn add-rpcmethod!
-  "Add METHOD to :rpcmethods of PLUGIN with :fn being FN.
-
-  The RPC methods should not be added to the plugin state with
-  that function but set when the plugin is first defined.
-
-  Specifically, anything that must be declared to lightningd
-  must be in plugin's state before the getmanifest round.
-
-  See clnplugin-clj/run, clnplugin-clj/gm-resp and
-  clnplugin-clj/setconfig!"
-  [method fn plugin]
-  (swap! plugin assoc-in [:rpcmethods method] {:fn fn}))
-
 (defn notif
   "Return a METHOD notification with PARAMS to be send to lightningd.
 
@@ -575,17 +561,43 @@
         true (let [next-line (read-line)]
                (recur (str req-acc line) next-line))))))
 
+(defn max-parallel-reqs
+  "..."
+  [plugin]
+  (let [mpr (:max-parallel-reqs @plugin)]
+    ;; because clojure.core.async.impl.protocols/MAX-QUEUE-SIZE is 1024
+    ;; if mpr not correctly provided we default to 512
+    (max 1 (or (and (int? mpr) (min mpr 1023)) 512))))
+
 (defn run [plugin]
-  (set-defaults! plugin)
-  (swap! plugin assoc :_out *out*)
-  (process-getmanifest! (read *in*) plugin)
-  (process-init! (read *in*) plugin)
-  (add-rpcmethod! :setconfig setconfig! plugin)
-  (swap! plugin assoc :_resps (agent nil))
-  (loop [req (read *in*)]
-    (when req
-      (go
-        (let [[log-msgs resp] (process req plugin)]
-          (doseq [msg log-msgs] (log msg "debug" plugin))
-          (send (:_resps @plugin) write [[req resp]] (:_out @plugin))))
-      (recur (read *in*)))))
+  (let [in *in* out *out*
+        max-parallel-reqs (max-parallel-reqs plugin)
+        resps (agent nil) ;; to synchronize writes to out
+        reqs (chan max-parallel-reqs) ;; to queue incoming requests from lightingd
+        ;; to apply backpressure on incoming lightingd requests we restrict
+        ;; the number of parallel requests being processed to max-parallel-reqs.
+        ;; So we always have reqs-in-progress < max-parallel-reqs.
+        reqs-in-progress (atom 0)]
+    (set-defaults! plugin)
+    (swap! plugin assoc :_out out) ;; for process-getmanifest!, process-init!, log and notify
+    (swap! plugin assoc :_resps resps) ;; for log and notify
+    (process-getmanifest! (read in) plugin)
+    (process-init! (read in) plugin)
+    (swap! plugin assoc-in [:rpcmethods :setconfig] {:fn setconfig!}) ;; For dynamic options
+    (thread
+      (loop [req (read in)]
+        (when req
+          (>!! reqs req)
+          (recur (read in)))))
+    (loop []
+      (if (< @reqs-in-progress max-parallel-reqs)
+        (let [req (<!! reqs)]
+          (swap! reqs-in-progress inc)
+          (go
+            (try
+              (let [[log-msgs resp] (process req plugin)]
+                (doseq [msg log-msgs] (log msg "debug" plugin))
+                (send resps write [[req resp]] out))
+              (finally (swap! reqs-in-progress dec))))
+          (recur))
+        (recur)))))

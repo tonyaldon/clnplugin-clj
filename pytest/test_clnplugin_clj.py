@@ -285,17 +285,58 @@ def test_errors(node_factory):
 
 
 def test_async(node_factory, executor):
+    # In the async... plugins we are Thread/sleep which block
+    # the thread of execution, so the machine running this test
+    # must be able to run 4 threads in parallel to get this test
+    # to pass
+
+    # max-parallel-reqs not specified in plugin so default to 512
     plugin = os.path.join(os.getcwd(), "pytest/plugins/async")
     l1 = node_factory.get_node(options={"plugin": plugin})
     start_time = time.time()
     # each call takes about 1 second
-    f1 = executor.submit(l1.rpc.call, "async")
-    f2 = executor.submit(l1.rpc.call, "async")
-    f3 = executor.submit(l1.rpc.call, "async")
+    f1 = executor.submit(l1.rpc.call, "sleep-and-update-counter")
+    f2 = executor.submit(l1.rpc.call, "sleep-and-update-counter")
+    f3 = executor.submit(l1.rpc.call, "sleep-and-update-counter")
     counter = {f1.result()["counter"],
                f2.result()["counter"],
                f3.result()["counter"]}
     delta = time.time() - start_time
     assert counter == {1,2,3}
-    # ensure the call to the method `async` are processed asynchronously
+    # ensure the call to the method `sleep-and-update-counter` are processed asynchronously
     assert delta < 1.5
+
+    # max-parallel-reqs set to 1 which makes plugin to process
+    # lightningd requests synchronously
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/async_sync")
+    l1 = node_factory.get_node(options={"plugin": plugin})
+    start_time = time.time()
+    # each call takes about 1 second
+    f1 = executor.submit(l1.rpc.call, "sleep-and-update-counter")
+    f2 = executor.submit(l1.rpc.call, "sleep-and-update-counter")
+    f3 = executor.submit(l1.rpc.call, "sleep-and-update-counter")
+    counter = {f1.result()["counter"],
+               f2.result()["counter"],
+               f3.result()["counter"]}
+    delta = time.time() - start_time
+    assert counter == {1,2,3}
+    # ensure the call to the method `sleep-and-update-counter` are processed synchronously
+    assert delta > 3.0
+
+    # max-parallel-reqs set to 2
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/async_max_parallel_reqs")
+    l1 = node_factory.get_node(options={"plugin": plugin})
+    start_time = time.time()
+    # each call takes about 1 second
+    f1 = executor.submit(l1.rpc.call, "sleep-and-update-counter")
+    f2 = executor.submit(l1.rpc.call, "sleep-and-update-counter")
+    f3 = executor.submit(l1.rpc.call, "sleep-and-update-counter")
+    counter = {f1.result()["counter"],
+               f2.result()["counter"],
+               f3.result()["counter"]}
+    delta = time.time() - start_time
+    assert counter == {1,2,3}
+    # ensure at most 2 `sleep-and-update-counter` request processed at the same time
+    assert delta > 2
+    # ensure at 2 `sleep-and-update-counter` request processed at the same time
+    assert delta < 3
