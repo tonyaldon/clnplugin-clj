@@ -194,12 +194,28 @@
 (defn gm-notifications
   "Return the vector of notifications meant to be used in the getmanifest response.
 
-  Check that it doesn't contain \"log\", \"message\" and \"progress\" specific
-  notification topics already defined by lightningd.
+  NOTIFICATIONS is a vector of the notification topics we want to
+  declare to lightningd.
+
+  For instance, if NOTIFICATIONS is [\"foo-0\" \"foo-1\" \"foo-2\"] we are
+  declaring the notifications \"foo-0\", \"foo-1\" and \"foo-2\" to
+  lightningd and once our plugin is started (getmanifest and init rounds
+  are OK) we can send those notifications to lightningd with `notify`
+  like this
+
+      (notify \"foo-0\" {:bar-0 \"baz-0\"} plugin)
+
+  where plugin is the state of our plugin.
+
+  The function `gm-notifications` checks that NOTIFICATIONS doesn't contain
+  \"log\", \"message\" and \"progress\" specific notification topics already
+  defined by lightningd.
 
   If you want to send these specific notifications use `log`, `notify-message`
   or `notify-progress` functions without adding the notification topics \"log\",
-  \"message\" and \"progress\" to :notifications vector of the plugin definition."
+  \"message\" and \"progress\" to :notifications vector of the plugin's definition.
+
+  See `gm-resp`, `process-getmanifest!` and `notify`."
   [notifications]
   (when notifications
     (let [f (fn [topic]
@@ -474,7 +490,7 @@
 
   5) At that point if PLUGIN's :options have been set correctly, we try
      to call :init-fn of PLUGIN if specified.  If no exception is thrown,
-     we reply to lightningd that's everything's ok on our side and that
+     we reply to lightningd that's everything's OK on our side and that
      we are ready to receive incoming requests.  If not, we disable
      the plugin with a JSON RPC response whose \"result\" field contains
      a \"disable\" field with a message reporting the exception."
@@ -603,25 +619,31 @@
 (defn write
   "Write to OUT the responses and notifications in RESPS collection.
 
-  Elements in RESPS are responses with :id key
+  Elements in RESPS are [req resp] vectors:
 
-      {:jsonrpc \"2.0\"
-       :id \"some-id\"
-       :result {:foo \"bar\"}}
+  - If req is non nil, `write` assumes that resp is the response
+    (which also can be an error) to req request.  So req looks
+    like this:
 
-      or
+        {:jsonrpc \"2.0\"
+         :id \"some-id\"
+         :result {:foo \"bar\"}}
 
-      {:jsonrpc \"2.0\"
-       :id \"some-id\"
-       :error {:code -32600
-               :message \"Something wrong happened\"}}
+        or
 
-  or they are notifications without :id key like this
+        {:jsonrpc \"2.0\"
+         :id \"some-id\"
+         :error {:code -32600
+                 :message \"Something wrong happened\"}}
 
-      {:jsonrpc \"2.0\"
-       :method \"log\"
-       :params {:level \"debug\"
-                :message \"Some message\"}}
+  - If req is nil, `write` assumes that resp is in fact a
+    notification (JSON RPC request without :id key) which
+    looks like this:
+
+        {:jsonrpc \"2.0\"
+         :method \"log\"
+         :params {:level \"debug\"
+                  :message \"Some message\"}}
 
   That function is meant to be an action-fn we send to
   an agent along with RESPS and OUT.  We use an agent to
@@ -633,7 +655,8 @@
   argument of any action-fn.  So the first argument of
   `write` is ignored.
 
-  See `log` and `process`."
+  See `write-resp`, `write-notif`, `log`, `notify`, `run`
+  `clojure.core/agent` and `clojure.core/send`."
   [_ resps out]
   (doseq [[req resp] resps]
     (if req
@@ -641,10 +664,11 @@
       (write-notif resp out))))
 
 (defn log
-  "Send a \"log\" notification to lightningd with level LEVEL.
+  "Send a \"log\" notification to lightningd with LEVEL level.
 
   If LEVEL is not specified, it is set to \"info\".  As per
-  common/status_levels.c file, log levels can be:
+  common/status_levels.c file in lightning repository, log levels
+  can be:
 
   - \"io\",
   - \"debug\",
@@ -657,7 +681,7 @@
   instead of one.  This is useful for sending exceptions when
   our plugin stops working correctly and throws exceptions.
 
-  See `exception`."
+  See `exception`, `write`, `write-resp`, `write-notif` and `run`."
   ([message plugin]
    (log message "info" plugin))
   ([message level plugin]
@@ -670,15 +694,21 @@
 (defn notify
   "Send a TOPIC notification to lightningd with PARAMS params.
 
-  Except for \"progress\" and \"message\" notifications, TOPIC
-  must be declared to lightningd during the getmanifest round.
+  Except for \"log\", \"message\" and \"progress\" notifications,
+  TOPIC must be declared to lightningd during the getmanifest round.
   If this is not the case, lightningd will ignore the notification
   (not forwarding it to the subscriber) and log something like this:
 
       Plugin attempted to send a notification to topic ...
       it hasn't declared in its manifest, not forwarding to subscribers.
 
-  See `gm-resp`."
+  Thus if we've defined \"foo\" topic notification (by adding it to
+  plugin's vector :notifications) when defining the plugin, we can send
+  a \"foo\" notification like this:
+
+      (notify \"foo\" {:bar \"baz\"} plugin)
+
+  See `gm-resp` and `gm-notifications`."
   ([topic params plugin]
    (send (:_resps @plugin) write [[nil (notif topic params)]] (:_out @plugin))
    nil))
