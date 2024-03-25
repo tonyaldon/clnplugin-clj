@@ -398,69 +398,6 @@
     (doseq [opt (seq options)]
       (set-option! opt plugin :at-init))))
 
-(defn process-init!
-  "Process \"init\" REQ request received from lightningd.
-
-  We store REQ in PLUGIN.  So after the init round with lightningd,
-  assuming plugin holds the state of our plugin, we'll be able to access
-  lightningd configuration like this:
-
-      (get-in @plugin [:init :configuration])
-
-  We set :socket-file PLUGIN's key to lightningd socket file.  This way
-  using `clnrpc-clj` library we can send RPC requests to lightningd like
-  this:
-
-      (rpc/getinfo @plugin)
-
-      or
-
-      (rpc/call @plugin \"invoice\"
-                {:amount_msat 10000
-                 :label \"some-label\"
-                 :description \"some-description\"})
-
-  We try to set options with the value given by the user through REQ.
-  If not possible we disable the plugin by replying to lightningd with
-  a JSON RPC response whose \"result\" field contains a \"disable\"
-  field with a message reporting which option made the intialization
-  of the plugin to fail.
-
-  At that point if options has been set correctly, we try to run
-  :init-fn of PLUGIN if specified.  If no exception is thrown, we
-  reply to lightningd that's everything's ok on our side and that
-  we are ready to receive incoming request.  If not, we disable
-  the plugin with a JSON RPC response whose \"result\" field contains
-  a \"disable\" field with a message reporting the exception."
-
-  [req plugin]
-  (let [dir (get-in req [:params :configuration :lightning-dir])
-        rpc-file (get-in req [:params :configuration :rpc-file])
-        socket-file (str (clojure.java.io/file dir rpc-file))
-        options (get-in req [:params :options])
-        out (:_out @plugin)
-        _ (add-request! req plugin)
-        _ (swap! plugin assoc-in [:socket-file] socket-file)
-        opts-disable (try
-                       (set-options-at-init! options plugin)
-                       (catch clojure.lang.ExceptionInfo e (ex-data e)))
-        init-fn (:init-fn @plugin)
-        ok-or-disable
-        (cond
-          (and (map? opts-disable) (contains? opts-disable :disable)) opts-disable
-          (nil? init-fn) {}
-          (fn? init-fn) (try
-                          (init-fn req plugin)
-                          {}
-                          (catch clojure.lang.ExceptionInfo e {:disable (ex-message e)})
-                          (catch Exception e {:disable (exception e)}))
-          true {:disable (format ":init-fn must be a function not '%s' which is an instance of '%s'"
-                                 init-fn (class init-fn))})
-        resp (assoc {:jsonrpc "2.0" :id (:id req)} :result ok-or-disable)]
-    (json/write resp out :escape-slash false)
-    (. out (append "\n\n")) ;; required by lightningd
-    (. out (flush))))
-
 (defn setconfig!
   "Set in PLUGIN the dynamic option specified in PARAMS to its new value.
 
@@ -499,6 +436,75 @@
         value (:val params)]
     (set-option! [kw-opt value] plugin)
     {}))
+
+(defn process-init!
+  "Process \"init\" REQ request received from lightningd.
+
+  `process-init!` do the following in order:
+
+  1) We store REQ in PLUGIN.  So after the init round with lightningd,
+     assuming plugin holds the state of our plugin, we'll be able to
+     access lightningd configuration like this:
+
+         (get-in @plugin [:init :configuration])
+
+  2) We add `setconfig!` as :fn of :setconfig method in :rpcmethods
+     map of PLUGIN.  This is for dynamic options handling.
+
+  3) We set :socket-file PLUGIN's key to lightningd socket file.  This
+     way using `clnrpc-clj` library we can send RPC requests to lightningd
+     like this:
+
+         (rpc/getinfo @plugin)
+
+         or
+
+         (rpc/call @plugin \"invoice\"
+                   {:amount_msat 10000
+                    :label \"some-label\"
+                    :description \"some-description\"})
+
+  4) We try to set PLUGIN's :options with the values given by the user
+     through REQ.  If not possible we disable the plugin by replying
+     to lightningd with a JSON RPC response whose \"result\" field
+     contains a \"disable\" field with a message reporting which option
+     made the intialization of the plugin to fail.
+
+  5) At that point if PLUGIN's :options have been set correctly, we try
+     to call :init-fn of PLUGIN if specified.  If no exception is thrown,
+     we reply to lightningd that's everything's ok on our side and that
+     we are ready to receive incoming requests.  If not, we disable
+     the plugin with a JSON RPC response whose \"result\" field contains
+     a \"disable\" field with a message reporting the exception."
+
+  [req plugin]
+  (let [dir (get-in req [:params :configuration :lightning-dir])
+        rpc-file (get-in req [:params :configuration :rpc-file])
+        socket-file (str (clojure.java.io/file dir rpc-file))
+        options (get-in req [:params :options])
+        out (:_out @plugin)
+        _ (add-request! req plugin)
+        _ (swap! plugin assoc-in [:rpcmethods :setconfig] {:fn setconfig!}) ;; For dynamic options
+        _ (swap! plugin assoc-in [:socket-file] socket-file)
+        opts-disable (try
+                       (set-options-at-init! options plugin)
+                       (catch clojure.lang.ExceptionInfo e (ex-data e)))
+        init-fn (:init-fn @plugin)
+        ok-or-disable
+        (cond
+          (and (map? opts-disable) (contains? opts-disable :disable)) opts-disable
+          (nil? init-fn) {}
+          (fn? init-fn) (try
+                          (init-fn req plugin)
+                          {}
+                          (catch clojure.lang.ExceptionInfo e {:disable (ex-message e)})
+                          (catch Exception e {:disable (exception e)}))
+          true {:disable (format ":init-fn must be a function not '%s' which is an instance of '%s'"
+                                 init-fn (class init-fn))})
+        resp (assoc {:jsonrpc "2.0" :id (:id req)} :result ok-or-disable)]
+    (json/write resp out :escape-slash false)
+    (. out (append "\n\n")) ;; required by lightningd
+    (. out (flush))))
 
 (defn notif
   "Return a METHOD notification with PARAMS to be send to lightningd.
@@ -754,7 +760,6 @@
     (swap! plugin assoc :_resps resps) ;; for log and notify
     (process-getmanifest! (read in) plugin)
     (process-init! (read in) plugin)
-    (swap! plugin assoc-in [:rpcmethods :setconfig] {:fn setconfig!}) ;; For dynamic options
     (thread
       (loop [req (read in)]
         (when req

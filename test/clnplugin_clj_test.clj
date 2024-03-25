@@ -580,15 +580,15 @@
     (plugin/process-init! req plugin)
     (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
            {:jsonrpc "2.0" :id 0 :result {}}))
-    (is (= (dissoc @plugin :_out)
+    (is (= (dissoc @plugin :rpcmethods :_out)
            {:options {}
-            :rpcmethods {}
             :dynamic true
             :getmanifest {:allow-deprecated-apis false}
             :init {:options {}
                    :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                    :rpc-file "lightning-rpc"}}
-            :socket-file "/tmp/l1-regtest/regtest/lightning-rpc"})))
+            :socket-file "/tmp/l1-regtest/regtest/lightning-rpc"}))
+    (is (fn? (get-in @plugin [:rpcmethods :setconfig :fn]))))
   ;; :init-fn function is ok
   (let [plugin (atom {:options {:foo nil
                                 :bar {:default "bar-default"}
@@ -607,12 +607,11 @@
     (plugin/process-init! req plugin)
     (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
            {:jsonrpc "2.0" :id 0 :result {}}))
-    (is (= (dissoc @plugin :init-fn :_out)
+    (is (= (dissoc @plugin :rpcmethods :init-fn :_out)
            {:options {:foo {:value "foo-value"}
                       :bar {:default "bar-default"
                             :value "bar-value"}
                       :baz {:dynamic true}}
-            :rpcmethods {}
             :dynamic true
             :getmanifest {:allow-deprecated-apis false}
             :init {:options {:foo "foo-value"
@@ -620,7 +619,8 @@
                    :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                    :rpc-file "lightning-rpc"}}
             :socket-file "/tmp/l1-regtest/regtest/lightning-rpc"
-            :set-by-init-fn "init-fn"})))
+            :set-by-init-fn "init-fn"}))
+    (is (fn? (get-in @plugin [:rpcmethods :setconfig :fn]))))
   ;; disable plugin because of :check-opt in plugin options
   ;;
   ;; :check-opt disable the plugin
