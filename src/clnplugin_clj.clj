@@ -535,9 +535,7 @@
   [msg out]
   (doseq [m (str/split-lines msg)]
     (let [notif (notif "log" {:level "debug" :message m})]
-      (json/write notif out
-                  :escape-slash false
-                  :default-write-fn json-default-write)
+      (json/write notif out :escape-slash false)
       (. out (append "\n\n")) ;; required by lightningd
       (. out (flush)))))
 
