@@ -197,15 +197,9 @@
   Check that it doesn't contain \"log\", \"message\" and \"progress\" specific
   notification topics already defined by lightningd.
 
-  If you want to send these specific notifications use
-
-  - `clnplugin-clj/log`,
-  - `clnplugin-clj/notify-message` or
-  - `clnplugin-clj/notify-progress`
-
-  functions without adding the notification topics \"log\", \"message\" and
-  \"progress\" to :notifications vector of the plugin definition.
-  "
+  If you want to send these specific notifications use `log`, `notify-message`
+  or `notify-progress` functions without adding the notification topics \"log\",
+  \"message\" and \"progress\" to :notifications vector of the plugin definition."
   [notifications]
   (when notifications
     (let [f (fn [topic]
@@ -235,10 +229,9 @@
 
   Note that only :options and :rpcmethods are mandatory.  If you don't
   specify them when you define your plugin, default empty values will
-  be set by `clnplugin-clj/set-defaults!` in `clnplugin-clj/run` function.
+  be set by `set-defaults!` in `run` function.
 
-  See `clnplugin-clj/gm-rpcmethods`, `clnplugin-clj/gm-options`,
-  and `clnplugin-clj/set-defaults!`."
+  See `gm-rpcmethods`, `gm-options` and `set-defaults!`."
   [req plugin]
   (let [p @plugin]
     {:jsonrpc "2.0"
@@ -258,24 +251,27 @@
   (swap! plugin #(merge {:options {} :rpcmethods {} :dynamic true} %)))
 
 (defn add-request!
-  "Store params of REQ in PLUGIN.
+  "Store :params of REQ in PLUGIN.
 
-  Use this to store params received from CLN in \"getmanifest\" and
+  We use it to add :getmanifest and :init keys to the plugin with
+  the value of :params of the respective \"getmanifest\" and
   \"init\" requests.
 
-  For instance, after using that function for \"init\" request,
-  we can get lightningd configuration like this (`plugin` being
-  the atom holding the state of our plugin):
+  So after the init round with lightningd, assuming plugin holds
+  the state of our plugin, we can access lightningd configuration
+  like this:
 
-      (get-in plugin [:init :configuration])"
+      (get-in @plugin [:init :configuration])
+
+  See `process-getmanifest!` and `process-init!`."
   [req plugin]
   (swap! plugin assoc (keyword (:method req)) (:params req)))
 
 (defn process-getmanifest!
-  "Process REQ being the \"getmanifest\" request received from lightningd.
+  "Process \"getmanifest\" REQ request received from lightningd.
 
-  We store that REQ in PLUGIN.  See clnplugin-clj/add-request!.
-  We send the response produced by clnplugin-clj/gm-resp."
+  We store that REQ in PLUGIN and send back to lightingd the response
+  produced by `gm-resp`."
   [req plugin]
   (let [out (:_out @plugin)]
     (add-request! req plugin)
@@ -284,20 +280,24 @@
     (. out (flush))))
 
 (defn exception
-  "..."
+  "Return exception E converted into a string."
   [e]
   (let [sw (new java.io.StringWriter)]
     (print-method e sw)
     (str sw)))
 
 (defn get-option
-  "..."
+  "Return value of KW-OPT in PLUGIN if any.
+
+  If value has not been set, return the default value if any.
+  If no value, no default or if KW-OPT is not defined in PLUGIN's
+  options, return nil."
   [plugin kw-opt]
   (or (get-in @plugin [:options kw-opt :value])
       (get-in @plugin [:options kw-opt :default])))
 
 (defn convert-opt-value
-  "..."
+  "Return VALUE converted into TYPE."
   [value type]
   ;; at the init round, value have the correct type specified
   ;; by the plugin.  So we return the value as is.  But,
@@ -325,15 +325,22 @@
 
   :check-opt function:
 
-  1) Before setting the option's value, call :check-opt function
+  1) Before setting the option's :value, call :check-opt function
      with VALUE and PLUGIN as argument.  If VALUE is not valid for
-     KW-OPT, :check-opt must thrown an exception with a message.
+     KW-OPT, :check-opt must throw an exception with a message.
      For instance, if KW-OPT is :foo, this can be done like this:
 
          (throw (ex-info \"Wrong option 'foo'\" {}))
 
-  2) If an excetpion is thrown, the plugin will be disable during
-     the init round.  See clnplugin-clj/process-init!
+  2) If an exception is thrown:
+
+     - the plugin will be disable during the init round.  See
+       `process-init!`, or,
+     - if this happens when setting a dynamic option with
+       `setconfig` lightningd JSON RPC command, `clnplugin-clj`
+       will return a JSON RPC error to lightningd and will not
+       set KW-OPT.
+
   3) Side effects, can be done in :check-opt.
   4) :check-opt is specific to each KW-OPT.
 
@@ -342,12 +349,12 @@
 
   Plugin options must not be set by plugin code but by
 
-  - clnplugin-clj/process-init! when the plugin processes lightningd
-    \"init\" request, or by,
-  - clnplugin-clj/setconfig! when the user dynamically sets a
-    dynamic option with `setconfig` lightningd JSON RPC command.
+  - `process-init!` when the plugin processes lightningd \"init\"
+    request, or by,
+  - `setconfig!` when the user dynamically sets a dynamic option
+    with `setconfig` lightningd JSON RPC command.
 
-  See clnplugin-clj/gm-option"
+  See `gm-option`, `gm-options` and `get-option`."
   ([[kw-opt value] plugin]
    (set-option! [kw-opt value] plugin false))
   ([[kw-opt value] plugin at-init?]
@@ -382,8 +389,8 @@
 (defn set-options-at-init!
   "Set OPTIONS in PLUGIN.
 
-  This is meant to be used by clnplugin-clj/process-init! when
-  we process lightningd \"init\" request."
+  This is meant to be used by `process-init!` when we process lightningd
+  \"init\" request."
   [options plugin]
   (when-not (empty? options)
     (doseq [opt (seq options)]
@@ -426,7 +433,7 @@
   requests sent by lightningd.
 
   When we declare to lightningd that \"foo-opt\" is a dynamic
-  option (during the getmanifest round, see clnplugin-clj/gm-option),
+  option (during the getmanifest round, see `gm-option`),
   that means that the user can use lightningd's JSON RPC command
   \"setconfig\" to set that option without restarting neither lightningd
   nor the plugin.
@@ -447,7 +454,7 @@
        \"params\": {\"config\": \"foo-opt\",
                   \"val\": \"foo-value\"}}
 
-  Finally, we handle that request with clnplugin-clj/setconfig! which
+  Finally, we handle that request with `setconfig!` which
 
   - sets the option :foo-opt to \"foo-value\" in :options map
     of PLUGIN and,
@@ -475,8 +482,7 @@
   This function is meant to be used as value of the option
   :default-write-fn of json/write function.
 
-  See clnplugin-clj/process-getmanifest!, clnplugin-clj/process-init!
-  and clnplugin-clj/write"
+  See `process-getmanifest!`, `process-init!` and `write`"
   [x out options]
   (let [sw (new java.io.StringWriter)]
     (print-method x sw)
@@ -564,9 +570,9 @@
   Note that to synchronize these writes, we don't need
   to use the state of the agent which is passed as first
   argument of any action-fn.  So the first argument of
-  clnplugin-clj/write is ignored.
+  `write` is ignored.
 
-  See clnplugin-clj/log and clnplugin-clj/process"
+  See `log` and `process`."
   [_ resps out]
   (doseq [[req resp] resps]
     (if req
@@ -590,7 +596,7 @@
   instead of one.  This is useful for sending exceptions when
   our plugin stops working correctly and throws exceptions.
 
-  See clnplugin-clj/exception"
+  See `exception`."
   ([message plugin]
    (log message "info" plugin))
   ([message level plugin]
@@ -650,12 +656,12 @@
      :params and PLUGIN,
   2) if an exception is thrown, use it as the value of :error
      key of the response to lightningd.  In that case, we log
-     the exception.  See clnplugin-clj/exception and clnplugin-clj/log
+     the exception.  See `exception` and `log`.
 
   All the processing is done in a go block.
 
   Writes to :_out of PLUGIN are synchronized with :_resps agent and
-  clnplugin-clj/write action function."
+  `write` action function."
   [req plugin]
   (let [req-id (:id req)
         method (keyword (:method req))
