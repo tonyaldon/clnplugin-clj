@@ -402,7 +402,9 @@
   "Set in PLUGIN the dynamic option specified in PARAMS to its new value.
 
   This function is meant to be used to process \"setconfig\"
-  requests sent by lightningd.
+  requests sent by lightningd.  This is why `process-init!` adds
+  it as :fn of :setconfig method in :rpcmethods map of the
+  plugin being started.
 
   When we declare to lightningd that \"foo-opt\" is a dynamic
   option (during the getmanifest round, see `gm-option`),
@@ -431,7 +433,7 @@
   - sets the option :foo-opt to \"foo-value\" in PLUGIN's :options
     map and,
   - returns an empty map if everything is OK."
-  [params req plugin]
+  [params _ plugin]
   (let [kw-opt (keyword (:config params))
         value (:val params)]
     (set-option! [kw-opt value] plugin)
