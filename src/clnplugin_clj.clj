@@ -417,7 +417,7 @@
 
       lightning-cli setconfig foo-opt foo-value
 
-  which triggered lightningd to send us the following \"setconfig\"
+  which triggers lightningd to send us the following \"setconfig\"
   request:
 
       {\"jsonrpc\": \"2.0\",
@@ -428,8 +428,8 @@
 
   Finally, we handle that request with `setconfig!` which
 
-  - sets the option :foo-opt to \"foo-value\" in :options map
-    of PLUGIN and,
+  - sets the option :foo-opt to \"foo-value\" in PLUGIN's :options
+    map and,
   - returns an empty map if everything is OK."
   [params req plugin]
   (let [kw-opt (keyword (:config params))
@@ -476,7 +476,6 @@
      we are ready to receive incoming requests.  If not, we disable
      the plugin with a JSON RPC response whose \"result\" field contains
      a \"disable\" field with a message reporting the exception."
-
   [req plugin]
   (let [dir (get-in req [:params :configuration :lightning-dir])
         rpc-file (get-in req [:params :configuration :rpc-file])
@@ -514,16 +513,12 @@
   {:jsonrpc "2.0" :method method :params params})
 
 (defn json-default-write
-  "Function to handle types which are unknown to data.json.
-
-  If the user gives us an object to write back to lightningd
-  that data.json doesn't handle, we 'stringify' it by wrapping
-  it in a (format \"%s\" ...) call.
+  "Write OBJ stringified to OUT.
 
   This function is meant to be used as value of the option
-  :default-write-fn of json/write function.
+  :default-write-fn of `json/write` function.
 
-  See `process-getmanifest!`, `process-init!` and `write`"
+  See `write-resp`."
   [x out options]
   (let [sw (new java.io.StringWriter)]
     (print-method x sw)
@@ -531,7 +526,21 @@
     (#'json/write-string (str sw) out options)))
 
 (defn- log-
-  "..."
+  "Send \"log\" notification to lightningd with debug \"level\" and MSG \"message\".
+
+  MSG is a string.  If it contains multiple lines, it is split
+  at newline separation and several \"log\" notifications are sent
+  instead of one.
+
+  Specifically, we write the notifications to OUT.
+
+  This function is meant to be used by `write-resp` (and `write-notif`)
+  while they are trying to send JSON RPC responses (respectively notifications)
+  to lightningd and they catch that some object is not JSON writable.  So
+  they use `log-` (and also `json-default-write`) to report of this fact.
+
+  You should not use `log-` to send \"log\" notification but \"log\"
+  function."
   [msg out]
   (doseq [m (str/split-lines msg)]
     (let [notif (notif "log" {:level "debug" :message m})]
