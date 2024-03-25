@@ -549,31 +549,42 @@
       (. out (flush)))))
 
 (defn write-resp
-  "..."
+  "Write RESP to OUT.
+
+  If RESP contains non JSON writable objects, RESP is transformed into
+  a JSON RPC error with the following fields \"code\", \"message\",
+  \"exception\", \"request\" and \"response\" that we write to OUT instead
+  of RESP.
+
+  See `gm-rpcmethods` docstring to understand why we do this.
+
+  See also `log-` and `write`."
   [req resp out]
   (let [r (try
             (json/write-str resp :escape-slash false)
             (catch Exception e
               (let [msg (format "Error while processing '%s', some objects in the response are not JSON writable" req)
-                    e-str (exception e)
-                    error {:code -32603
-                           :message msg
-                           :exception e-str
-                           :request req
-                           :response resp}
-                    new-resp (assoc (dissoc resp :error :result)
-                                    :error error) ]
+                    exception (exception e)
+                    error {:code -32603 :message msg :exception exception
+                           :request req :response resp}
+                    new-resp (assoc (dissoc resp :error :result) :error error) ]
                 (log- msg out)
-                (log- e-str out)
-                (json/write-str new-resp
-                                :escape-slash false
+                (log- exception out)
+                (json/write-str new-resp :escape-slash false
                                 :default-write-fn json-default-write))))]
-    (. out (append r))
-    (. out (append "\n\n")) ;; required by lightningd
+    ;; an empty line after the r is expected by lightningd though not enforced
+    (. out (append (str r "\n\n")))
     (. out (flush))))
 
 (defn write-notif
-  "..."
+  "Write NOTIF to OUT.
+
+  If NOTIF contains non JSON writable objects, do not write NOTIF to OUT.
+
+  Instead, we log NOTIF stringified and the exception thrown by the JSON
+  writer.
+
+  See `log-` and `write`."
   [notif out]
   (let [r (try
             (json/write-str notif :escape-slash false)
@@ -583,8 +594,8 @@
                 (log- (exception e) out)
                 nil)))]
     (when r
-      (. out (append r))
-      (. out (append "\n\n")) ;; required by lightningd
+      ;; an empty line after the r is expected by lightningd though not enforced
+      (. out (append (str r "\n\n")))
       (. out (flush)))))
 
 (defn write
@@ -665,7 +676,7 @@
       Plugin attempted to send a notification to topic ...
       it hasn't declared in its manifest, not forwarding to subscribers.
 
-  See plugin/gm-resp"
+  See `gm-resp`."
   ([topic params plugin]
    (send (:_resps @plugin) write [[nil (notif topic params)]] (:_out @plugin))
    nil))
