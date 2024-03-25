@@ -390,22 +390,57 @@
   "Set OPTIONS in PLUGIN.
 
   This is meant to be used by `process-init!` when we process lightningd
-  \"init\" request."
+  \"init\" request.
+
+  See `set-option!`, `gm-option`, `gm-options` and `get-option`."
   [options plugin]
   (when-not (empty? options)
     (doseq [opt (seq options)]
       (set-option! opt plugin :at-init))))
 
 (defn process-init!
-  "..."
+  "Process \"init\" REQ request received from lightningd.
+
+  We store REQ in PLUGIN.  So after the init round with lightningd,
+  assuming plugin holds the state of our plugin, we'll be able to access
+  lightningd configuration like this:
+
+      (get-in @plugin [:init :configuration])
+
+  We set :socket-file PLUGIN's key to lightningd socket file.  This way
+  using `clnrpc-clj` library we can send RPC requests to lightningd like
+  this:
+
+      (rpc/getinfo @plugin)
+
+      or
+
+      (rpc/call @plugin \"invoice\"
+                {:amount_msat 10000
+                 :label \"some-label\"
+                 :description \"some-description\"})
+
+  We try to set options with the value given by the user through REQ.
+  If not possible we disable the plugin by replying to lightningd with
+  a JSON RPC response whose \"result\" field contains a \"disable\"
+  field with a message reporting which option made the intialization
+  of the plugin to fail.
+
+  At that point if options has been set correctly, we try to run
+  :init-fn of PLUGIN if specified.  If no exception is thrown, we
+  reply to lightningd that's everything's ok on our side and that
+  we are ready to receive incoming request.  If not, we disable
+  the plugin with a JSON RPC response whose \"result\" field contains
+  a \"disable\" field with a message reporting the exception."
+
   [req plugin]
   (let [dir (get-in req [:params :configuration :lightning-dir])
         rpc-file (get-in req [:params :configuration :rpc-file])
         socket-file (str (clojure.java.io/file dir rpc-file))
         options (get-in req [:params :options])
         out (:_out @plugin)
-        _ (swap! plugin assoc-in [:socket-file] socket-file)
         _ (add-request! req plugin)
+        _ (swap! plugin assoc-in [:socket-file] socket-file)
         opts-disable (try
                        (set-options-at-init! options plugin)
                        (catch clojure.lang.ExceptionInfo e (ex-data e)))
