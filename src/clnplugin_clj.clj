@@ -8,6 +8,11 @@
 (defn gm-option
   "Check option and return it in a format understable by lightningd.
 
+  For instance, given [:foo {:type \"int\" :default -1}] this function
+  returns:
+
+      {:name \"foo\" :type \"int\" :description \"\" :default -1}
+
   - TYPE and DESCRIPTION are mandatory.
   - TYPE can only be:
     - \"string\": a string
@@ -15,22 +20,25 @@
     - \"bool\": a boolean
     - \"flag\": no-arg flag option.  Presented as true if config specifies it.
   - If TYPE is string or int, MULTI can be set to true which indicates
-    that the option can be specified multiple times.  These will always be represented
-    in the init request as a (possibly empty) JSON array.
+    that the option can be specified multiple times.  These will always
+    be represented in the init request as a (possibly empty) JSON array.
 
   If TYPE is not specified, set it to \"string\".
 
   If DESCRIPTION is not specified, set it to \"\".
 
   If DYNAMIC is true, KW-NAME can be set dynamically with `setconfig`
-  CLN command.
+  lightningd command.
 
-  If DEPRECATED is true and the user sets `allow-deprecated-apis` to false,
-  KW-NAME option is disabled by lightningd and must not be used by the plugin."
+  If DEPRECATED is true and the user sets lightningd option
+  `allow-deprecated-apis` to false, KW-NAME option is disabled
+  by lightningd and must not be used by the plugin.
+
+  See `gm-options`."
   [[kw-name {:keys [type description default multi dynamic deprecated]}]]
   ;; Don't check options.  Raising an exception here is useless
   ;; because lightningd won't let us log it or will ignore any json
-  ;; response (with an `error` field) to the getmanifest request.
+  ;; response (with an error field) to the getmanifest request.
   (let [name {:name (name kw-name)}
         type (if (nil? type) {:type "string"} {:type type})
         description {:description (or description "")}
@@ -43,17 +51,128 @@
 (defn gm-options
   "Return the vector of plugin options meant to be used in the getmanifest response.
 
-  See clnplugin-clj/gm-option."
+  See `gm-option` and `process-getmanifest!`."
   [options]
   (mapv gm-option (seq options)))
 
 (defn gm-rpcmethods
   "Return the vector of RPC methods meant to be used in the getmanifest response.
 
-  The \"rpcmethods\" field is required in the getmanifest response:
-      - if no method to define, \"rpcmethods\" must be an empty vector,
-      - if methods are supplied, they must contain fields \"name\", \"usage\"
-        and \"description\""
+  RPCMETHODS is a list ([kw-1 map-1] [kw-2 map-2] ...) obtained from
+  :rpcmethods map of the plugin's definition.  kw-1 defines the name
+  (as keyword) of a RPC method and map-1 the information about that
+  method.  The same goes for [kw-2 map-2], ...
+
+  map-1 must contains a :fn key:
+
+  - whose value is a function taking 3 arguments [params req plugin]:
+
+    - params: value of \"params\" field of kw-1 request we receive from
+              lightningd,
+    - req:    kw-1 request we receive from lightingd.  (:params req)
+              is equal to the first argument params.  (:id req) gives
+              us the id of the request.  Needed for RPC methods that
+              would like to use `notify-message` and `notify-progress`
+              functions.
+    - plugin: the plugin (which is an atom) that we passed to `run`
+              function to run the plugin.  It contains the current
+              state of the plugin.
+
+  - when the plugin receives a request for kw-1 method, `clnplugin-clj`
+    calls its :fn function:
+
+    1) if no exception thrown, `clnplugin-clj` replies to lightningd with
+       a 'result' field in the response set to the value returned by :fn,
+    2) if an exception is thrown, `clnplugin-clj` replies to lightningd with
+       an \"error\" field in the response set with an error \"code\", a
+       \"message\", the \"exception\" depending on who thrown it and maybe
+       additional informations.
+
+       What does this means?
+
+       1) if :fn is wrongly written `clnplugin-clj` will catch any
+          `Throwable` and report it to the caller (via lightningd) in the
+          form of a JSON RPC error response,
+       2) if for some request you want to reply to lightningd with a
+          JSON RPC error response, you just have to throw a `Throwable`.
+          The best way to do this is to throw a `clojure.lang.ExceptionInfo`
+          with an :error key (containing :code and :message keys) in the
+          map passed to `clojure.core/ex-info` like this:
+
+              (throw
+               (ex-info \"some message\"
+                        {:error {:code -100 :message \"some message\"}}))
+
+          Any additional information in :error map will retained in the
+          JSON RPC error response.  If :error doesn't contain :code or
+          :message keys, they will be created for you, :code defaulting
+          to -32603.
+
+    Note that if :fn returned value contains non JSON writable objects
+    (but doesn't throw an exception), `clnplugin-clj` transforms the response
+    to lighningd into a JSON RPC error with the following fields: \"code\",
+    \"message\", \"exception\", \"request\" and \"response\".  This behavior
+    is interesting for three reasons:
+
+    - when writing :fn we can mistakenly put non JSON writable objects
+      and I prefer to get noticed of this with a graceful JSON RPC error
+      than by the JSON writer library with an exception like this:
+
+          Execution error at clojure.data.json/default-write-fn (json.clj:783).
+          Don't know how to write JSON of class clojure.lang.Atom
+
+    - when writing our plugin, we can inspect the state of our plugin
+      by returning any desired object in :fn returned value,
+    - `clnplugin-clj` doesn't silently convert non JSON writable objects
+      into strings in your normal JSON RPC response which may cause
+      lightningd or other plugins receiving that JSON to throw an error
+      because they don't understand those string representations of Clojure
+      objects. I prefer to get the error reported by `clnplugin-clj`
+      eagerly.  A little drawback of doing this is that when a method only
+      does side effects, we have to put an empty object like {} or nil at
+      the end to be returned in the JSON response to lightningd.
+
+  Let's take an example in which we define a plugin that declares to
+  lightningd a method 'foo' that always returns {\"bar\": \"baz\"} JSON
+  object when called.
+
+  We can define it like this
+
+      (def plugin
+        (atom {:rpcmethods
+               {:foo {:usage \"how to use 'foo'\"
+                      :description \"some description\"
+                      :fn (fn [params req plugin]
+                            {:bar \"baz\"})}}}))
+
+  and run it like this:
+
+      (run plugin)
+
+  At some point `gm-rpcmethods` will receive the following list as argument
+
+      ([:foo {:usage \"how to use 'foo'\"
+              :description \"some description\"
+              :fn #object[...]}])
+
+  and will returns
+
+      [{:name \"foo\"
+        :usage \"how to use 'foo'\"
+        :description \"some description\"}]
+
+  which lightningd understands.
+
+  Note that the \"rpcmethods\" field is required in the getmanifest response
+  we send back to lightningd:
+
+  - if no method to define, \"rpcmethods\" must be an empty vector, so
+    `gm-rpcmethods` returns [] if RPCMETHODS is empty,
+  - if methods are supplied, they must contain \"name\", \"usage\" and
+    \"description\" fields.  If we don't specify them in map of [kw map]
+    elements of RPCMETHODS, they will be set to the empty string \"\".
+
+  See `gm-resp`, `process-getmanifest!` and `process`."
   [rpcmethods]
   (let [f (fn [[kw-name method]]
             (let [method-fn (:fn method)]
@@ -73,19 +192,28 @@
     (mapv f (seq rpcmethods))))
 
 (defn gm-notifications
-  "Return the vector of notifications meant to be used in the getmanifest response."
+  "Return the vector of notifications meant to be used in the getmanifest response.
+
+  Check that it doesn't contain \"log\", \"message\" and \"progress\" specific
+  notification topics already defined by lightningd.
+
+  If you want to send these specific notifications use
+
+  - `clnplugin-clj/log`,
+  - `clnplugin-clj/notify-message` or
+  - `clnplugin-clj/notify-progress`
+
+  functions without adding the notification topics \"log\", \"message\" and
+  \"progress\" to :notifications vector of the plugin definition.
+  "
   [notifications]
   (when notifications
     (let [f (fn [topic]
               (cond
-                (= topic "log")
-                (throw (ex-info "Remove 'log' from :notifications vector.  This is a specific notification that expects a specific params field in the JSON RPC notification.  It is used to log messages in lightningd log file.  To do this use clnplugin-clj/log function." {}))
-                (= topic "message")
-                (throw (ex-info "Remove 'message' from :notifications vector.  This is a specific notification that expects a specific params field in the JSON RPC notification.  It is used to tell lightningd that the response to a JSON RPC request from lightningd is being processed.  To send 'message' notifications use clnplugin-clj/notif-message." {}))
-                (= topic "progress")
-                (throw (ex-info "Remove 'progress' from :notifications vector.  This is a specific notification that expects a specific params field in the JSON RPC notification.  It is used to tell lightningd that the response to a JSON RPC request from lightningd is being processed and to inform about its progress before replying with the actual response.  To send 'progress' notifications use clnplugin-clj/notif-progress." {}))
-                true
-                {:method topic}))]
+                (= topic "log") (throw (ex-info "Remove 'log' from :notifications vector.  This is a specific notification that expects a specific params field in the JSON RPC notification.  It is used to log messages in lightningd log file.  To do this use clnplugin-clj/log function." {}))
+                (= topic "message") (throw (ex-info "Remove 'message' from :notifications vector.  This is a specific notification that expects a specific params field in the JSON RPC notification.  It is used to tell lightningd that the response to a JSON RPC request from lightningd is being processed.  To send 'message' notifications use clnplugin-clj/notif-message." {}))
+                (= topic "progress") (throw (ex-info "Remove 'progress' from :notifications vector.  This is a specific notification that expects a specific params field in the JSON RPC notification.  It is used to tell lightningd that the response to a JSON RPC request from lightningd is being processed and to inform about its progress before replying with the actual response.  To send 'progress' notifications use clnplugin-clj/notif-progress." {}))
+                true {:method topic}))]
       (mapv f notifications))))
 
 (defn gm-resp
@@ -96,20 +224,21 @@
 
   - :options,
   - :rpcmethods,
-  - :dynamic,
   - :subscriptions,
   - :hooks,
-  - :featurebits,
   - :notifications,
-  - :custommessages,
-  - :nonnumericids
+  - :dynamic,
+  - :featurebits,
+  - :custommessages.
 
   will retained in the response to be sent to lightningd.
 
-  Note that only :options and :rpcmethods are mandatory.
+  Note that only :options and :rpcmethods are mandatory.  If you don't
+  specify them when you define your plugin, default empty values will
+  be set by `clnplugin-clj/set-defaults!` in `clnplugin-clj/run` function.
 
-  See clnplugin-clj/gm-rpcmethods, clnplugin-clj/gm-options,
-  and clnplugin-clj/set-defaults! ."
+  See `clnplugin-clj/gm-rpcmethods`, `clnplugin-clj/gm-options`,
+  and `clnplugin-clj/set-defaults!`."
   [req plugin]
   (let [p @plugin]
     {:jsonrpc "2.0"
@@ -122,10 +251,11 @@
               {:notifications notifications}))}))
 
 (defn set-defaults!
-  "Set default values for :dynamic, :options and :rpcmethods keys if omitted."
+  "Set default values for :dynamic, :options and :rpcmethods keys if omitted.
+
+  In particular, plugins are dynamic by default if not otherwise specified."
   [plugin]
-  (swap! plugin #(merge {:options {} :rpcmethods {} :dynamic true}
-                        %)))
+  (swap! plugin #(merge {:options {} :rpcmethods {} :dynamic true} %)))
 
 (defn add-request!
   "Store params of REQ in PLUGIN.
