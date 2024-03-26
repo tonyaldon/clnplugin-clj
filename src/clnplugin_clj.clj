@@ -884,23 +884,24 @@
      (notify "progress" params plugin))))
 
 (defn process
-  "Process REQ.
+  "Return [log-msgs resp] vector where resp is the response to REQ.
 
-  Check if :method of REQ belong to :rpcmethods map of PLUGIN.
-  If yes, try to apply its :fn function to :params of REQ and
-  PLUGIN:
+  Specifically, we look for a method defined for REQ's :method in PLUGIN's
+  :rpcmethods map and we try to apply its corresponding :fn function with
+  (:params REQ), REQ and PLUGIN arguments:
 
-  1) if no exception is thrown, send back a response to lightningd
-     with :result being the returned value of applying :fn to
-     :params and PLUGIN,
-  2) if an exception is thrown, use it as the value of :error
-     key of the response to lightningd.  In that case, we log
-     the exception.  See `exception` and `log`.
+  1) if no exception is thrown, :fn's result becomes the value of
+     :result field of the JSON RPC response (a Clojure map still) resp
+     and log-msgs is set to nil because we have nothing to log.  So
+     in that case `process` returns [nil resp] vector.
 
-  All the processing is done in a go block.
+  2) if an exception is thrown, we catch it, create a vector log-msgs
+     of messages we want to log to report this exception and we
+     create an error map that becomes the value of :error field of the
+     JSON RPC response (a Clojure map still) resp.  Finally, we
+     return [log-msgs resp] vector.
 
-  Writes to :_out of PLUGIN are synchronized with :_resps agent and
-  `write` action function."
+  See `gm-rpcmethods`, `log` and `run`."
   [req plugin]
   (let [req-id (:id req)
         method (keyword (:method req))
