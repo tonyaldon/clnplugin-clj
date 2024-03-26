@@ -38,19 +38,47 @@
   See `gm-options`."
   [[kw-name {:keys [type description default multi dynamic deprecated] :as option}]]
   (let [name {:name (name kw-name)}
-        type (if (nil? type) {:type "string"} {:type type})
+        type (cond (nil? type)
+                   {:type "string"}
+                   (some #{type} #{"string" "int" "bool" "flag"})
+                   {:type type}
+                   true
+                   (throw
+                    (ex-info
+                     (format "Wrong type '%s' for option %s.  Authorized types are: string, int, bool, flag."
+                             type {kw-name option})
+                     {:kw-name kw-name :option option})))
         description {:description (or description "")}
-        default (when default {:default default})
-        multi (when multi {:multi true})
-        dynamic (and dynamic {:dynamic true})
+        types {java.lang.String "string"
+               java.lang.Long "int"
+               java.lang.Boolean "bool"}
+        default (when default
+                  (let [default-type (get types (class default))]
+                    (if (= default-type (:type type))
+                      {:default default}
+                      (throw
+                       (ex-info
+                        (format "Default value of '%s' option has the wrong type.  '%s' type is expected and default value is '%s': %s"
+                                kw-name (:type type) default {kw-name option})
+                        {})))))
+        multi (when multi
+                (if (some #{(:type type)} #{"string" "int"})
+                  {:multi true}
+                  (throw
+                   (ex-info
+                    (format "'%s' option cannot be 'multi'.  Only options of type 'string' and 'int' can: %s"
+                            kw-name {kw-name option})
+                    {}))))
+        ;; An option cannot be multi and dynamic at the same time.
+        ;; If we try to set dynamically with setconfig command an option
+        ;; which is multi, lightningd will crash.  So we don't allow to
+        ;; define a multi dynamic option in the first place.
+        dynamic (when dynamic
+                  (if multi
+                    (throw (ex-info (format "'%s' option cannot be multi and dynamic at the same time: %s"
+                                            kw-name {kw-name option}) {}))
+                    {:dynamic true}))
         deprecated (and deprecated {:deprecated true})]
-    ;; An option cannot be multi and dynamic at the same time.
-    ;; If we try to set dynamically with setconfig command an option
-    ;; which is multi, lightningd will crash.  So we don't allow to
-    ;; define a multi dynamic option in the first place.
-    (when (and multi dynamic)
-      (throw (ex-info (format "'%s' option cannot be multi and dynamic at the same time: %s"
-                              kw-name {kw-name option}) {})))
     (merge name type description default multi dynamic deprecated)))
 
 (defn gm-options
