@@ -918,9 +918,24 @@
          (merge jsonrpc {:error {:code -32603 :message msg :exception (exception e)}})]))))
 
 (defn read
-  "Read a CLN JSON-RPC request from IN.
+  "Read one lightningd JSON-RPC request from IN.
 
-  CLN requests end with an empty line \"\\n\\n\"."
+  JSON fields are converted into keywords: \"id\" -> :id.
+  We assumes lightningd requests end with an empty line \"\\n\\n\".
+  Throw an error if the data read is not a valid JSON object.
+
+  In the default execution of the plugin, IN is `*in*`.  See `run`.
+
+  Here an example.  Evaluating this expression
+
+      (let [req-str \"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":0,\\\"method\\\":\\\"foo\\\",\\\"params\\\":{}}\\n\\n\"]
+          (with-open [in (-> (java.io.StringReader. req-str)
+                             clojure.lang.LineNumberingPushbackReader.)]
+            (read in)))
+
+  gives us:
+
+      {:jsonrpc \"2.0\" :id 0 :method \"foo\" :params {}}"
   [in]
   (binding [*in* in]
     (loop [req-acc "" line (read-line)]
@@ -937,7 +952,10 @@
                (recur (str req-acc line) next-line))))))
 
 (defn max-parallel-reqs
-  "..."
+  "Return the maximun number of requests allowed to be processed in parallel.
+
+  Look at PLUGIN's :max-parallel-reqs key which must be < 1024.
+  Default to 512"
   [plugin]
   (let [mpr (:max-parallel-reqs @plugin)]
     ;; because clojure.core.async.impl.protocols/MAX-QUEUE-SIZE is 1024
