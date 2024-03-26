@@ -714,7 +714,70 @@
    nil))
 
 (defn notify-message
-  "..."
+  "Send a \"message\" notification to lightningd with MESSAGE message and LEVEL level.
+
+  If LEVEL is not specified, default to \"info\" level.
+
+  Specifically, assuming req has the id \"some-id\" and plugin holds the
+  state of the plugin, calling
+
+      (notify-message \"Some message\" req plugin)
+
+  will send the following \"message\" notification to lightningd:
+
+      {\"jsonrpc\": \"2.0\",
+       \"method\": \"message\"
+       \"params\": {\"id\": \"some-id\",
+                  \"level\": \"info\"
+                  \"message\": \"Some message\"}}
+
+  \"message\" notifications are used to tell lightningd that the response to
+  a JSON RPC request from lightningd is being processed.  So while a request
+  is being processed, if we send \"message\" notifications and if the issuer
+  of the request had enabled notifications (with `notifications` lightningd
+  command) for the JSON RPC connection, it will receive these \"message\"
+  notifications.
+
+  Let's take an example.
+
+  We assume that we defined \"foo\" method to lightningd by adding it to
+  plugin's :rpcmethods map and its :fn function is the following which
+  send the messages \"foo\", \"bar\" and \"baz\" with 0.5s delay between
+  them before replying to the request with {:foo \"bar\"}:
+
+      (fn [params req plugin]
+        (plugin/notify-message \"foo\" req plugin)
+        (Thread/sleep 500)
+        (plugin/notify-message \"bar\" req plugin)
+        (Thread/sleep 500)
+        (plugin/notify-message \"baz\" req plugin)
+        {:foo \"bar\"})
+
+  By default lightning-cli enables notifications for the JSON RPC connection
+  and prints them out prepended with '# '.  So calling \"foo\" method
+  like this
+
+      lightning-cli foo
+
+  gives us the following output:
+
+      # foo
+      # bar
+      # baz
+      {
+       \"foo\": \"bar\"
+      }
+
+  If we don't want to receive these notifications we can use --notifications
+  flag like this
+
+      lightning-cli --notifications=none foo
+
+  which gives us:
+
+      {
+       \"foo\": \"bar\"
+      }"
   ([message req plugin]
    (notify-message message "info" req plugin))
   ([message level req plugin]
@@ -722,7 +785,10 @@
    (notify "message" {:id (:id req) :message message :level level} plugin)))
 
 (defn notify-progress
-  "..."
+  "...
+
+  Remove 'progress' from :notifications vector.  This is a specific notification that expects a specific params field in the JSON RPC notification.  It is used to tell lightningd that the response to a JSON RPC request from lightningd is being processed and to inform about its progress before replying with the actual response.  To send 'progress' notifications use clnplugin-clj/notif-progress.
+  "
   ([step total-steps req plugin]
    (notify-progress step total-steps nil nil req plugin))
   ([step total-steps stage total-stages req plugin]
