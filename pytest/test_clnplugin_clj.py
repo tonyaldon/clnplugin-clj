@@ -27,6 +27,9 @@ def test_rpcmethods(node_factory):
 
 def test_getmanifest(node_factory):
     l1 = node_factory.get_node()
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_options_mutli_dynamic")
+    with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
+        l1.rpc.plugin_start(plugin)
     plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_getinfo_internal_method")
     with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
         l1.rpc.plugin_start(plugin)

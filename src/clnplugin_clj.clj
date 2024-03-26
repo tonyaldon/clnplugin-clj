@@ -28,7 +28,8 @@
   If DESCRIPTION is not specified, set it to \"\".
 
   If DYNAMIC is true, KW-NAME can be set dynamically with `setconfig`
-  lightningd command.
+  lightningd command.  Note that an option cannot be DYNAMIC and MULTI
+  at the same time.
 
   If DEPRECATED is true and the user sets lightningd option
   `allow-deprecated-apis` to false, KW-NAME option is disabled
@@ -36,9 +37,6 @@
 
   See `gm-options`."
   [[kw-name {:keys [type description default multi dynamic deprecated]}]]
-  ;; Don't check options.  Raising an exception here is useless
-  ;; because lightningd won't let us log it or will ignore any json
-  ;; response (with an error field) to the getmanifest request.
   (let [name {:name (name kw-name)}
         type (if (nil? type) {:type "string"} {:type type})
         description {:description (or description "")}
@@ -46,6 +44,13 @@
         multi (when multi {:multi true})
         dynamic (and dynamic {:dynamic true})
         deprecated (and deprecated {:deprecated true})]
+    ;; An option cannot be multi and dynamic at the same time.
+    ;; If we try to set dynamically with setconfig command an option
+    ;; which is multi, lightningd will crash.  So we don't allow to
+    ;; define a multi dynamic option in the first place.
+    (when (and multi dynamic)
+      (throw (ex-info (format "'%s' option cannot be multi and dynamic at the same time."
+                              kw-name) {})))
     (merge name type description default multi dynamic deprecated)))
 
 (defn gm-options

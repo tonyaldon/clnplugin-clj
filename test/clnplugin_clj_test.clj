@@ -63,7 +63,15 @@
          {:name "foo"
           :type "string"
           :description "foo-description"
-          :deprecated true})))
+          :deprecated true}))
+  ;; an option cannot be dynamic and multi at the same time
+  (is (thrown-with-msg?
+       Throwable
+       #"':foo' option cannot be multi and dynamic at the same time."
+       (plugin/gm-option [:foo {:type "string"
+                                :description "foo-description"
+                                :multi true
+                                :dynamic true}]))))
 
 (deftest gm-options-test
   (is (= (plugin/gm-options {}) []))
