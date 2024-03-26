@@ -175,8 +175,17 @@
   See `gm-resp`, `process-getmanifest!` and `process`."
   [rpcmethods]
   (let [f (fn [[kw-name method]]
-            (let [method-fn (:fn method)]
+            (let [;; methods defined in lightning with: AUTODATA(json_command,...);
+                  lightningd-internal-methods '(:addgossip :addpsbtoutput :batching :blacklistrune :blindedpath :check :checkmessage :checkrune :close :connect :createinvoice :createinvrequest :createoffer :createonion :creatrune :datastore :datastoreusage :decodepay :deldatastore :delexpiredinvoice :delforward :delinvoice :delpay :deprecations :destroyrune :dev :dev-fail :dev-feerate :dev-forget-channel :dev-gossip-set-time :dev-ignore-htlcs :dev-listaddrs :dev-memdump :dev-memleak :dev-queryrates :dev-quiesce :dev-reenable-commit :dev-report-fds :dev-rescan-output :dev-set-max-scids-encode-size :dev-sign-last-tx :dev-suppress-gossip :disableinvoicerequest :disableoffer :disconnect :feerates :fundchannel_cancel :fundchannel_complete :fundchannel_start :fundpsbt :getinfo :getlog :help :invoice :invokerune :listclosedchannels :listconfigs :listdatastore :listforwards :listfunds :listhtlcs :listinvoicerequests :listinvoices :listoffers :listpeerchannels :listpeers :listsendpays :listtransactions :makesecret :newaddr :notifications :openchannel_abort :openchannel_bump :openchannel_init :openchannel_signed :openchannel_update :parsefeerate :payersign :ping :plugin :preapproveinvoice :preapprovekeysend :recover :recoverchannel :reserveinputs :sendcustommsg :sendonion :sendonionmessage :sendpay :sendpsbt :setchannel :setconfig :setleaserates :setpsbtversion :showrunes :signinvoice :signmessage :signpsbt :splice_init :splice_signed :splice_update :staticbackup :stop :unreserveinputs :utxopsbt :wait :waitanyinvoice :waitblockheight :waitinvoice :waitsendpay)
+                  method-fn (:fn method)]
               (cond
+                ;; throw an error if we try to define a method already registered
+                ;; as an internal lightningd method.  If we don't do that, starting
+                ;; the plugin with this kind of method will crash lightningd.  This
+                ;; is not the case for methods already defined in another plugin.
+                (some #(= kw-name %) lightningd-internal-methods)
+                (throw (ex-info (format "You cannot define '%s' method which is already a lightningd internal method."
+                                        kw-name) {}))
                 (nil? method-fn)
                 (throw (ex-info (format ":fn is not defined for '%s' RPC method"
                                         kw-name) {}))

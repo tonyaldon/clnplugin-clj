@@ -129,6 +129,11 @@
           {:name "foo-5" :usage "usage-5" :description "description-5"
            :long_description "long-description-5"}
           {:name "foo-6" :usage "" :description "" :deprecated true}]))
+  ;; cannot declare methods which are already lightningd internal methods
+  (is (thrown-with-msg?
+       Throwable
+       #"You cannot define ':getinfo' method which is already a lightningd internal method."
+       (plugin/gm-rpcmethods {:getinfo {}})))
   ;; :fn is not defined
   (is (thrown-with-msg?
        Throwable
