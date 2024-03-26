@@ -36,7 +36,7 @@
   by lightningd and must not be used by the plugin.
 
   See `gm-options`."
-  [[kw-name {:keys [type description default multi dynamic deprecated]}]]
+  [[kw-name {:keys [type description default multi dynamic deprecated] :as option}]]
   (let [name {:name (name kw-name)}
         type (if (nil? type) {:type "string"} {:type type})
         description {:description (or description "")}
@@ -49,8 +49,8 @@
     ;; which is multi, lightningd will crash.  So we don't allow to
     ;; define a multi dynamic option in the first place.
     (when (and multi dynamic)
-      (throw (ex-info (format "'%s' option cannot be multi and dynamic at the same time."
-                              kw-name) {})))
+      (throw (ex-info (format "'%s' option cannot be multi and dynamic at the same time: %s"
+                              kw-name {kw-name option}) {})))
     (merge name type description default multi dynamic deprecated)))
 
 (defn gm-options
