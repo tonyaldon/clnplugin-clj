@@ -718,7 +718,7 @@
 
   If LEVEL is not specified, default to \"info\" level.
 
-  Specifically, assuming req has the id \"some-id\" and plugin holds the
+  Specifically, assuming req has the :id \"some-id\" and plugin holds the
   state of the plugin, calling
 
       (notify-message \"Some message\" req plugin)
@@ -726,9 +726,9 @@
   will send the following \"message\" notification to lightningd:
 
       {\"jsonrpc\": \"2.0\",
-       \"method\": \"message\"
+       \"method\": \"message\",
        \"params\": {\"id\": \"some-id\",
-                  \"level\": \"info\"
+                  \"level\": \"info\",
                   \"message\": \"Some message\"}}
 
   \"message\" notifications are used to tell lightningd that the response to
@@ -785,10 +785,92 @@
    (notify "message" {:id (:id req) :message message :level level} plugin)))
 
 (defn notify-progress
-  "...
+  "Send a \"progress\" notification to lightningd.
 
-  Remove 'progress' from :notifications vector.  This is a specific notification that expects a specific params field in the JSON RPC notification.  It is used to tell lightningd that the response to a JSON RPC request from lightningd is being processed and to inform about its progress before replying with the actual response.  To send 'progress' notifications use clnplugin-clj/notif-progress.
-  "
+  Specifically, assuming req has the :id \"some-id\" and plugin holds the
+  state of the plugin, calling
+
+      (notify-progress 0 3 req plugin)
+
+  will send the following \"progress\" notification to lightningd
+
+      {\"jsonrpc\": \"2.0\",
+       \"method\": \"progress\",
+       \"params\": {\"id\": \"some-id\",
+                  \"num\": 0,
+                  \"total\": 3}}
+
+  and calling
+
+      (plugin/notify-progress 1 2 0 3 req plugin)
+
+  will send the following \"progress\" notification to lightningd
+
+      {\"jsonrpc\": \"2.0\",
+       \"method\": \"progress\",
+       \"params\": {\"id\": \"some-id\",
+                  \"num\": 1,
+                  \"total\": 2,
+                  \"stage\": {\"num\": 0,
+                            \"total\": 3}}}
+
+  STEP starts at 0 and must be < to TOTAL-STEPS.
+  STAGE starts at 0 and must be < to TOTAL-STAGES.
+
+  \"progress\" notifications are used to tell lightningd that the response to
+  a JSON RPC request from lightningd is being processed and to inform about
+  its progress before replying with the actual response.  So while a request
+  is being processed, if we send \"progress\" notifications and if the issuer
+  of the request had enabled notifications (with `notifications` lightningd
+  command) for the JSON RPC connection, it will receive these \"progress\"
+  notifications.
+
+  Let's take an example.
+
+  We assume that we defined \"foo\" method to lightningd by adding it to
+  plugin's :rpcmethods map and its :fn function is the following which
+  send 3 \"progress\" notifications with 1s delay between them before
+  replying to the request with {:foo \"bar\"}:
+
+      (fn [params req plugin]
+        (plugin/notify-progress 0 3 req plugin)
+        (Thread/sleep 1000)
+        (plugin/notify-progress 1 3 req plugin)
+        (Thread/sleep 1000)
+        (plugin/notify-progress 2 3 req plugin)
+        {:foo \"bar\"})
+
+  By default lightning-cli enables notifications for the JSON RPC connection
+  and prints them out prepended with '# '.  So calling \"foo\" method
+  like this
+
+      lightning-cli foo
+
+  gives us the following outputs
+
+      # 1/3 |                                                            |
+
+  replaced 1s later by this
+
+      # 2/3 |==============================                              |
+
+  finally replaced 1s later by this:
+
+      # 3/3 |============================================================|
+      {
+       \"foo\": \"bar\"
+      }
+
+  If we don't want to receive these notifications we can use --notifications
+  flag like this
+
+      lightning-cli --notifications=none foo
+
+  which gives us:
+
+      {
+       \"foo\": \"bar\"
+      }"
   ([step total-steps req plugin]
    (notify-progress step total-steps nil nil req plugin))
   ([step total-steps stage total-stages req plugin]
