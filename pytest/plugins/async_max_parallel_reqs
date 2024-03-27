@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
 
-plugin_dir=/home/tony/work/projects/clnplugin-clj/pytest/plugins/
-cd $plugin_dir
-# clojure -M foo.clj
-exec clojure -M async_max_parallel_reqs.clj
+cd /home/tony/work/projects/clnplugin-clj/pytest/plugins/
+clojure -M async_max_parallel_reqs.clj

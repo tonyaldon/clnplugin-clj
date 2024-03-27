@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
 
-plugin_dir=/home/tony/work/projects/clnplugin-clj/pytest/plugins/
-cd $plugin_dir
-# clojure -M foo.clj
-exec clojure -M init_disable_init_fn_not_a_function.clj
+cd /home/tony/work/projects/clnplugin-clj/pytest/plugins/
+clojure -M init_disable_init_fn_not_a_function.clj
