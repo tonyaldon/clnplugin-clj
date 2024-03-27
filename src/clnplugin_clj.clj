@@ -978,11 +978,34 @@
 
   gives us:
 
-      {:jsonrpc \"2.0\" :id 0 :method \"foo\" :params {}}"
+      {:jsonrpc \"2.0\" :id 0 :method \"foo\" :params {}}
+
+  When we shutdown lightningd
+
+  - with `lightning-cli stop` or
+  - by killing lightningd process,
+
+  lightningd will end its connection with us (without killing us) and
+  in that case `read` will notice it and will return nil.  This way the
+  caller of `read` will be responsible to exit itself.  See `run`.
+
+  Note: interestingly when we stop the plugin with
+
+      lightning-cli plugin stop ...
+
+  lightningd kills the plugin with something like this
+
+      kill(plugin->pid, SIGKILL);
+
+  and so in that case `run` (the caller of `read`) doesn't need
+  to exit itself and nothing special needs to be done by `read` either."
   [in]
   (binding [*in* in]
     (loop [req-acc "" line (read-line)]
       (cond
+        ;; This happens when we shutdown lightningd:
+        ;; - with `lightning-cli stop` or
+        ;; - by killing lightningd process.
         (nil? line) nil
         ;; lightningd requests end with an empty line "\n\n".
         (empty? line) (try
@@ -1021,9 +1044,16 @@
     (process-init! (read in) plugin)
     (thread
       (loop [req (read in)]
-        (when req
-          (>!! reqs req)
-          (recur (read in)))))
+        (if req
+          (do (>!! reqs req)
+              (recur (read in)))
+          ;; This happens when we shutdown lightningd:
+          ;; - with `lightning-cli stop` or
+          ;; - by killing lightningd process.
+          ;; As we are using agents and they use non-daemon background
+          ;; threads which prevents shutdown of the JVM, we need
+          ;; to exit explicitly.
+          (System/exit 0))))
     (loop []
       (if (< @reqs-in-progress max-parallel-reqs)
         (let [req (<!! reqs)]

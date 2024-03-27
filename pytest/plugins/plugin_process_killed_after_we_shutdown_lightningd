@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+cd /home/tony/work/projects/clnplugin-clj/pytest/plugins/
+clojure -M plugin_process_killed_after_we_shutdown_lightningd.clj

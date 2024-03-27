@@ -1,7 +1,9 @@
 from pyln.testing.fixtures import *
 from pyln.client import RpcError
 import os
+import subprocess
 import time
+
 
 def test_rpcmethods(node_factory):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/rpcmethods")
@@ -91,6 +93,24 @@ def test_init(node_factory):
     plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_init_fn")
     with pytest.raises(RpcError, match=r"disabled by user"):
         l1.rpc.plugin_start(plugin)
+
+
+def test_plugin_process_killed_after_we_shutdown_lightningd(node_factory):
+    plugin = os.path.join(os.getcwd(), "pytest/plugins/plugin_process_killed_after_we_shutdown_lightningd")
+    l1 = node_factory.get_node(options={"plugin": plugin})
+    line = l1.daemon.is_in_log(r'.*started\([0-9]*\).*plugins/plugin_process_killed_after_we_shutdown_lightningd')
+    pidstr = re.search(r'.*started\(([0-9]*)\).*plugins/plugin_process_killed_after_we_shutdown_lightningd', line).group(1)
+
+    # shutdown l1
+    l1.stop()
+    # I don't know how long do we need to wait
+    # (1s seems enough, 5s should be good)
+    time.sleep(5)
+    # check that plugin's process has been killed
+    proc = subprocess.run(["ps", "--pid", pidstr], stdout=subprocess.DEVNULL)
+    # 1 means that ps can't select pidstr process, so it no longer exists
+    # and plugin's process has been killed, and this is what we want.
+    assert proc.returncode == 1
 
 
 def test_options_deprecated(node_factory):
