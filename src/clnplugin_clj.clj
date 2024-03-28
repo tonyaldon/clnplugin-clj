@@ -268,6 +268,27 @@
                 true {:method topic}))]
       (mapv f notifications))))
 
+(defn gm-subscriptions
+  "Return the vector of subscriptions meant to be used in the getmanifest response."
+  [subscriptions]
+  (let [f (fn [[kw-name subscription]]
+            (let [subscription-fn (:fn subscription)]
+              (cond
+                (nil? subscription-fn)
+                (throw (ex-info (format ":fn is not defined for '%s' notification topic in :subscriptions map."
+                                        kw-name) {}))
+                (not (fn? subscription-fn))
+                (throw (ex-info (format "Error in '%s' notification topic in :subscriptions map.  :fn must be a function not '%s' which is an instance of '%s'"
+                                        kw-name subscription-fn (class subscription-fn)) {})))
+              (name kw-name)))]
+    (when-let [s (seq subscriptions)]
+      (let [subs (mapv f s)]
+        ;; If we subscribe to "*" (all notification topics), lightningd
+        ;; expects the vector ["*"] as value for subscriptions field.  So we do.
+        ;; But we allow in plugins's :subscriptions map to declare :* and others
+        ;; notification topics.
+        (if (some #(= % "*") subs) ["*"] subs)))))
+
 (defn gm-resp
   "Return the response to the getmanifest REQ.
 
@@ -298,6 +319,8 @@
      (merge {:options (gm-options (:options p))
              :rpcmethods (gm-rpcmethods (:rpcmethods p))
              :dynamic (:dynamic p)}
+            (when-let [subscriptions (gm-subscriptions (:subscriptions p))]
+              {:subscriptions subscriptions})
             (when-let [notifications (gm-notifications (:notifications p))]
               {:notifications notifications}))}))
 
@@ -947,7 +970,11 @@
   [req plugin]
   (let [req-id (:id req)
         method (keyword (:method req))
-        method-fn (get-in (:rpcmethods @plugin) [method :fn])
+        method-fn (if req-id
+                    (get-in (:rpcmethods @plugin) [method :fn])
+                    (when-let [subs (:subscriptions @plugin)]
+                      (or (get-in subs [method :fn])
+                          (get-in subs [:* :fn]))))
         msg (format "Error while processing '%s'" req)
         jsonrpc {:jsonrpc "2.0" :id req-id}]
     (try
@@ -1037,11 +1064,37 @@
         ;; the number of parallel requests being processed to max-parallel-reqs.
         ;; So we always have reqs-in-progress < max-parallel-reqs.
         reqs-in-progress (atom 0)]
+
     (set-defaults! plugin)
     (swap! plugin assoc :_out out) ;; for process-getmanifest!, process-init!, log and notify
     (swap! plugin assoc :_resps resps) ;; for log and notify
+
+    ;; getmanifest round
     (process-getmanifest! (read in) plugin)
-    (process-init! (read in) plugin)
+
+    ;; init round
+    ;;
+    ;; It is possible to receive notifications before receiving the
+    ;; init request.  See the following function calls (in lightning repository):
+    ;;
+    ;;     plugin_manifest_cb
+    ;;     └── check_plugins_manifests
+    ;;         └── plugin_check_subscriptions
+    ;;
+    ;; We test this in test_subscriptions_and_notifications.
+    (loop [req (read in)]
+      (cond
+        (and (:id req) (= (:method req) "init"))
+        (do
+          (await resps) ;; in case we're writing to out when handling notifications
+          (process-init! req plugin))
+        (:id req) (throw (ex-info (format "Expect 'init' request but received %s" req) {}))
+        ;; this is a notification
+        true (let [[log-msgs resp] (process req plugin)]
+               (doseq [msg log-msgs] (log msg "debug" plugin))
+               (recur (read in)))))
+
+    ;; read incoming requests and queue them
     (thread
       (loop [req (read in)]
         (if req
@@ -1054,6 +1107,8 @@
           ;; threads which prevents shutdown of the JVM, we need
           ;; to exit explicitly.
           (System/exit 0))))
+
+    ;; process queued requests
     (loop []
       (if (< @reqs-in-progress max-parallel-reqs)
         (let [req (<!! reqs)]

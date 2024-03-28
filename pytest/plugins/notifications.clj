@@ -3,10 +3,10 @@
 
 (def plugin
   (atom {:rpcmethods
-         {:notify-topic-undeclared
+         {:notify-topic-undeclared-0
           {:fn
            (fn [params req plugin]
-             (plugin/notify "topic-undeclared" "some params" plugin))}
+             (plugin/notify "topic-undeclared-0" "some params" plugin))}
           :notify-topic-0
           {:fn
            (fn [params req plugin]

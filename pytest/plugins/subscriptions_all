@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+cd /home/tony/work/projects/clnplugin-clj/pytest/plugins/
+clojure -M subscriptions_all.clj

@@ -223,24 +223,53 @@ def test_log(node_factory):
     assert l1.daemon.is_in_log(r"line 2 - logged by 'log-multi-lines'")
 
 
-def test_notifications(node_factory):
-    plugins = [os.path.join(os.getcwd(), "pytest/plugins/subscribe.py"),
+def test_subscriptions_and_notifications(node_factory):
+    plugins = [os.path.join(os.getcwd(), "pytest/plugins/subscriptions"),
                os.path.join(os.getcwd(), "pytest/plugins/notifications")]
     l1 = node_factory.get_node(options={"plugin": plugins})
 
     l1.rpc.call("notify-topic-0")
-    l1.daemon.wait_for_log(r"Got a topic-0 notification.*{.*foo-0.*: .*bar-0.*} from plugin notifications")
+    l1.daemon.wait_for_log(r'Got a topic-0 notification {:foo-0 \\"bar-0\\"} from plugin notifications')
     l1.rpc.call("notify-topic-1")
-    l1.daemon.wait_for_log(r"Got a topic-1 notification.*topic-1 params.* from plugin notifications")
-
-    l1.rpc.call("notify-topic-undeclared")
-    l1.daemon.wait_for_log(r"Plugin attempted to send a notification to topic.*topic-undeclared.*not forwarding")
+    l1.daemon.wait_for_log(r"Got a topic-1 notification topic-1 params from plugin notifications")
+    l1.rpc.call("notify-topic-undeclared-0")
+    l1.daemon.wait_for_log(r'Plugin attempted to send a notification to topic "topic-undeclared-0" it hasn\'t declared in its manifest, not forwarding to subscribers.')
     time.sleep(1)
-    assert not l1.daemon.is_in_log(r"Got a topic-undeclared notification.*some params.* from plugin notifications")
+    assert not l1.daemon.is_in_log(r"Got a topic-undeclared-0 notification.*some params.* from plugin notifications")
 
     l1.rpc.call("notify-topic-1-non-json-writable")
     assert l1.daemon.is_in_log(r"Error while sending notification.*:method.*topic-1")
     assert l1.daemon.is_in_log(r":cause.*Don't know how to write JSON of class clojure.lang.Atom")
+
+    # subscriptions.clj subscribed to 'connect' notification
+    l2 = node_factory.get_node()
+    l2.rpc.connect(l1.info['id'], 'localhost', l1.port)
+    assert l1.daemon.wait_for_log("plugin-subscriptions: Got a connect notification")
+
+    # as subscriptions.clj plugin subscribes to 'topic-undeclared-0'
+    # and 'topic-undeclared-1' and notifications.clj doesn't declare these notification
+    # topics, when l1 starts subscriptions_all.clj plugin which registers to all
+    # notifications, it will receive the following warning notification
+    #
+    #     {"jsonrpc":"2.0","method":"warning","params":{"warning":{"level":"warn","time":"1711620196.233333777","timestamp":"2024-03-28T10:03:16.233Z","source":"plugin-subscriptions","log":"topic 'topic-undeclared-0' is not a known notification topic"}}}
+    #     {"jsonrpc":"2.0","method":"warning","params":{"warning":{"level":"warn","time":"1711620196.233345766","timestamp":"2024-03-28T10:03:16.233Z","source":"plugin-subscriptions","log":"topic 'topic-undeclared-1' is not a known notification topic"}}}
+    #
+    # before receiving the init request.
+    # Here we test that we take this fact into account!
+    plugin_subscriptions_all = os.path.join(os.getcwd(), "pytest/plugins/subscriptions_all")
+    l1.rpc.plugin_start(plugin_subscriptions_all)
+    l1.daemon.wait_for_log(r"plugin-subscriptions_all: Got a warning notification before the init request:.*topic-undeclared-0")
+    l1.daemon.wait_for_log(r"plugin-subscriptions_all: Got a warning notification before the init request:.*topic-undeclared-1")
+
+    # connect topic: subscriptions_all.clj subscribed to '*' notifications (example of connect topic)
+    l2 = node_factory.get_node()
+    l2.rpc.connect(l1.info['id'], 'localhost', l1.port)
+    l1.daemon.wait_for_log("plugin-subscriptions_all: Got a connect notification")
+
+    # shutdown topic: subscriptions_all.clj subscribed to '*' notifications (example of s)
+    l1.rpc.plugin_stop(plugin_subscriptions_all)
+    l1.daemon.wait_for_log("plugin-subscriptions_all: subscriptions.clj plugin shutting down itself")
+    l1.daemon.wait_for_log("plugin-subscriptions_all: Killing plugin: exited during normal operation")
 
 
 def test_notifications_message_progress(node_factory):

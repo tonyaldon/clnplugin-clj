@@ -241,6 +241,34 @@
        #"Remove 'progress' from :notifications vector."
        (plugin/gm-notifications ["progress"]))))
 
+(deftest gm-subscriptions-test
+  (is (= (plugin/gm-subscriptions nil) nil))
+  (is (= (plugin/gm-subscriptions
+          {:foo-0 {:fn (fn [params req plugin])}
+           :foo-1 {:fn (fn [params req plugin])}
+           :foo-2 {:fn (fn [params req plugin])}})
+         ["foo-0" "foo-1" "foo-2"]))
+  (is (= (plugin/gm-subscriptions
+          {:foo-0 {:fn (fn [params req plugin])}
+           :foo-1 {:fn (fn [params req plugin])}
+           :* {:fn (fn [params req plugin])}})
+         ["*"]))
+  ;; :fn is not defined
+  (is (thrown-with-msg?
+       Throwable
+       #":fn is not defined for ':foo' notification topic in :subscriptions map."
+       (plugin/gm-subscriptions {:foo {}})))
+  ;; error because :fn is not a function
+  (is (thrown-with-msg?
+       Throwable
+       #"Error in ':foo' notification topic in :subscriptions map.  :fn must be a function not '\[:a-vector \"is not a function\"\]' which is an instance of 'class clojure.lang.PersistentVector'"
+       (plugin/gm-subscriptions {:foo {:fn [:a-vector "is not a function"]}})))
+  ;; error because :fn is not a function (we don't allow symbol as value of :fn)
+  (is (thrown-with-msg?
+       Throwable
+       #"Error in ':foo' notification topic in :subscriptions map.  :fn must be a function not 'some-symbol' which is an instance of 'class clojure.lang.Symbol'"
+       (plugin/gm-subscriptions {:foo {:fn 'some-symbol}}))))
+
 (deftest gm-resp-test
   ;; defaults
   (is (= (let [plugin (atom {:options {}
@@ -265,7 +293,7 @@
           :result {:options []
                    :rpcmethods []
                    :dynamic false}}))
-  ;; options and rpcmethods not empty
+  ;; options, rpcmethods, subscriptions and notifications not empty
   (is (= (let [plugin
                (atom {:options {:foo-1 nil
                                 :foo-2 {:type "string"
@@ -284,6 +312,10 @@
                                    :foo-4 {:usage "usage-4"
                                            :description "description-4"
                                            :fn (fn [param plugin])}}
+                      :subscriptions {:foo-0 {:fn (fn [params req plugin])}
+                                      :foo-1 {:fn (fn [params req plugin])}
+                                      :foo-2 {:fn (fn [params req plugin])}}
+                      :notifications ["topic-1" "topic-2" "topic-3"]
                       :dynamic true})
                req {:id 16}]
            (plugin/gm-resp req plugin))
@@ -307,6 +339,8 @@
                                 {:name "foo-2" :usage "usage-2" :description ""}
                                 {:name "foo-3" :usage "" :description "description-3"}
                                 {:name "foo-4" :usage "usage-4" :description "description-4"}]
+                   :subscriptions ["foo-0" "foo-1" "foo-2"]
+                   :notifications [{:method "topic-1"} {:method "topic-2"} {:method "topic-3"}]
                    :dynamic true}}))
   ;; error because :fn is not a function for foo rpcmethod
   (is (thrown-with-msg?
@@ -317,19 +351,16 @@
                            :dynamic true})
              req {:id 16}]
          (plugin/gm-resp req plugin))))
-  ;; notifications ok
-  (is (= (let [plugin (atom {:options {}
-                             :rpcmethods {}
-                             :dynamic true
-                             :notifications ["topic-1" "topic-2" "topic-3"]})
-               req {:id 16}]
-           (plugin/gm-resp req plugin))
-         {:jsonrpc "2.0"
-          :id 16
-          :result {:options []
-                   :rpcmethods []
-                   :dynamic true
-                   :notifications [{:method "topic-1"} {:method "topic-2"} {:method "topic-3"}]}}))
+  ;; error because :fn is not a function for foo notification topic
+  (is (thrown-with-msg?
+       Throwable
+       #"Error in ':foo' notification topic in :subscriptions map.  :fn must be a function not '\[:a-vector \"is not a function\"\]' which is an instance of 'class clojure.lang.PersistentVector'"
+       (let [plugin (atom {:options {}
+                           :rpcmethods {}
+                           :dynamic true
+                           :subscriptions {:foo {:fn [:a-vector "is not a function"]}}})
+             req {:id 16}]
+         (plugin/gm-resp req plugin))))
   ;; "log", "message", "progress" notifications not to be declared
   (is (thrown-with-msg?
        Throwable
@@ -1262,7 +1293,32 @@
            #"(?s)#error.*:cause.*Assert failed: \(< 0 -1\)"
            (get-in resp [:error :exception])))
       (is (re-find #"Error while processing.*method.*assertion-error" (first log-msgs)))
-      (is (re-find #" :cause \"Assert failed: \(< 0 -1\)\"" (second log-msgs))))))
+      (is (re-find #" :cause \"Assert failed: \(< 0 -1\)\"" (second log-msgs)))))
+
+  ;; subscriptions
+  (let [plugin (atom {:subscriptions
+                      {:foo-0 {:fn (fn [params req plugin]
+                                     (swap! plugin assoc :foo-0 "bar-0"))}
+                       :foo-1 {:fn (fn [params req plugin]
+                                     (swap! plugin assoc :foo-1 params))}
+                       :* {:fn (fn [params req plugin]
+                                 (swap! plugin assoc :* ["all" (:method req)]))}}})
+        req-0 {:jsonrpc "2.0" :method "foo-0" :params {}}
+        req-1 {:jsonrpc "2.0" :method "foo-1" :params {:bar-1 "baz-1"}}
+        req-2 {:jsonrpc "2.0" :method "foo-2" :params {}}]
+    (plugin/process req-0 plugin)
+    (plugin/process req-1 plugin)
+    (plugin/process req-2 plugin)
+    (is (= (:foo-0 @plugin) "bar-0"))
+    (is (= (:foo-1 @plugin) {:bar-1 "baz-1"}))
+    (is (= (:* @plugin) ["all" "foo-2"])))
+
+  ;; subscription error - receive a notification with no corresponding subscription
+  (let [plugin (atom {:subscriptions {}})
+        req {:jsonrpc "2.0" :method "foo" :params {}}
+        [log-msgs _] (plugin/process req plugin)]
+    (is (re-find #"Error while processing.*method.*foo" (first log-msgs)))
+    (is (re-find #":cause.*Cannot.*invoke.*clojure.lang.IFn.invoke.*because.*method_fn.*is.*null" (second log-msgs)))))
 
 (deftest read-test
   (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}
