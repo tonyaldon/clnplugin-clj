@@ -664,16 +664,14 @@
 
 (deftest process-init!-test
   (let [plugin (atom {:options {} :rpcmethods {} :dynamic true
-                      :getmanifest {:allow-deprecated-apis false}
-                      :_out (new java.io.StringWriter)})
+                      :getmanifest {:allow-deprecated-apis false}})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (plugin/process-init! req plugin)
-    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+    (is (= (plugin/process-init! req plugin)
            {:jsonrpc "2.0" :id 0 :result {}}))
-    (is (= (dissoc @plugin :rpcmethods :_out)
+    (is (= (dissoc @plugin :rpcmethods)
            {:options {}
             :dynamic true
             :getmanifest {:allow-deprecated-apis false}
@@ -682,6 +680,7 @@
                                    :rpc-file "lightning-rpc"}}
             :socket-file "/tmp/l1-regtest/regtest/lightning-rpc"}))
     (is (fn? (get-in @plugin [:rpcmethods :setconfig :fn]))))
+
   ;; :init-fn function is ok
   (let [plugin (atom {:options {:foo nil
                                 :bar {:default "bar-default"}
@@ -690,17 +689,15 @@
                       :dynamic true
                       :getmanifest {:allow-deprecated-apis false}
                       :init-fn (fn [req plugin]
-                                 (swap! plugin assoc-in [:set-by-init-fn] "init-fn"))
-                      :_out (new java.io.StringWriter)})
+                                 (swap! plugin assoc-in [:set-by-init-fn] "init-fn"))})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {:foo "foo-value"
                                 :bar "bar-value"}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (plugin/process-init! req plugin)
-    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
+    (is (= (plugin/process-init! req plugin)
            {:jsonrpc "2.0" :id 0 :result {}}))
-    (is (= (dissoc @plugin :rpcmethods :init-fn :_out)
+    (is (= (dissoc @plugin :rpcmethods :init-fn)
            {:options {:foo {:value "foo-value"}
                       :bar {:default "bar-default"
                             :value "bar-value"}
@@ -724,16 +721,13 @@
                           (throw (ex-info "Wrong option 'foo'" {})))}}
                       :rpcmethods {}
                       :dynamic true
-                      :getmanifest {:allow-deprecated-apis false}
-                      :_out (new java.io.StringWriter)})
+                      :getmanifest {:allow-deprecated-apis false}})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {:foo "foo-value"}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (plugin/process-init! req plugin)
-    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
-           {:jsonrpc "2.0" :id 0
-            :result {:disable "Wrong option 'foo'"}})))
+    (is (= (plugin/process-init! req plugin)
+           {:jsonrpc "2.0" :id 0 :result {:disable "Wrong option 'foo'"}})))
   ;; :check-opt is called for each option before we try to run
   ;; :init-fn.  So, a wrong option will disable the plugin before
   ;; we try to run :init-fn
@@ -745,16 +739,14 @@
                       :rpcmethods {}
                       :dynamic true
                       :init-fn (fn [req plugin] (/ 1 0))
-                      :getmanifest {:allow-deprecated-apis false}
-                      :_out (new java.io.StringWriter)})
+                      :getmanifest {:allow-deprecated-apis false}})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {:foo "foo-value"}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (plugin/process-init! req plugin)
-    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
-           {:jsonrpc "2.0" :id 0
-            :result {:disable "Wrong option 'foo'"}})))
+
+    (is (= (plugin/process-init! req plugin)
+           {:jsonrpc "2.0" :id 0 :result {:disable "Wrong option 'foo'"}})))
 
   ;; :check-opt is not a function
   (let [plugin (atom {:options
@@ -762,16 +754,13 @@
                        {:check-opt [:a-vector "is not a function"]}}
                       :rpcmethods {}
                       :dynamic true
-                      :getmanifest {:allow-deprecated-apis false}
-                      :_out (new java.io.StringWriter)})
+                      :getmanifest {:allow-deprecated-apis false}})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {:foo "foo-value"}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (plugin/process-init! req plugin)
-    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
-           {:jsonrpc "2.0" :id 0
-            :result {:disable ":check-opt of ':foo' option must be a function not '[:a-vector \"is not a function\"]' which is an instance of 'class clojure.lang.PersistentVector'"}})))
+    (is (= (plugin/process-init! req plugin)
+           {:jsonrpc "2.0" :id 0 :result {:disable ":check-opt of ':foo' option must be a function not '[:a-vector \"is not a function\"]' which is an instance of 'class clojure.lang.PersistentVector'"}})))
 
   ;; :check-opt throws an error at execution time
   (let [plugin (atom {:options
@@ -779,17 +768,14 @@
                        {:check-opt (fn [value plugin] (/ 1 0))}}
                       :rpcmethods {}
                       :dynamic true
-                      :getmanifest {:allow-deprecated-apis false}
-                      :_out (new java.io.StringWriter)})
+                      :getmanifest {:allow-deprecated-apis false}})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {:foo "foo-value"}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (plugin/process-init! req plugin)
     (is (re-find
          #"(?s):check-opt of ':foo' option thrown the following exception when called with 'foo-value' value:.*#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
-         (get-in (json/read-str (str (:_out @plugin)) :key-fn keyword)
-                 [:result :disable]))))
+         (get-in (plugin/process-init! req plugin) [:result :disable]))))
   ;; disable plugin because of :init-fn plugin key
   ;;
   ;; :init-fn not a function
@@ -803,42 +789,38 @@
              :params {:options {}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (plugin/process-init! req plugin)
-    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
-           {:jsonrpc "2.0" :id 0
-            :result {:disable ":init-fn must be a function not 'not-a-function' which is an instance of 'class clojure.lang.Symbol'"}})))
+
+    (is (= (plugin/process-init! req plugin)
+           {:jsonrpc "2.0" :id 0 :result {:disable ":init-fn must be a function not 'not-a-function' which is an instance of 'class clojure.lang.Symbol'"}})))
   ;; :init-fn throws an error
   (let [plugin (atom {:options {}
                       :rpcmethods {}
                       :dynamic true
                       :getmanifest {:allow-deprecated-apis false}
-                      :init-fn (fn [req plugin] (/ 1 0))
-                      :_out (new java.io.StringWriter)})
+                      :init-fn (fn [req plugin] (/ 1 0))})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (plugin/process-init! req plugin)
-    (let [resp (json/read-str (str (:_out @plugin)) :key-fn keyword)]
-      (is (re-find
-           #"(?s)#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
-           (get-in resp [:result :disable])))))
+
+    (is (re-find
+         #"(?s)#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
+         (get-in (plugin/process-init! req plugin) [:result :disable]))))
   ;; :init-fn disable the plugin
   (let [plugin (atom {:options {}
                       :rpcmethods {}
                       :dynamic true
                       :getmanifest {:allow-deprecated-apis false}
                       :init-fn (fn [req plugin]
-                                 (throw (ex-info "disabled by user" {})))
-                      :_out (new java.io.StringWriter)})
+                                 (throw (ex-info "disabled by user" {})))})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (plugin/process-init! req plugin)
-    (let [resp (json/read-str (str (:_out @plugin)) :key-fn keyword)]
-      (is (= (-> resp :result :disable str/split-lines first)
-             "disabled by user")))))
+
+    (is (= (-> (plugin/process-init! req plugin)
+               :result :disable str/split-lines first)
+           "disabled by user"))))
 
 (deftest setconfig!-test
   ;; Note that lightningd send `setconfig` requests

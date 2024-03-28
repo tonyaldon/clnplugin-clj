@@ -554,11 +554,13 @@
      made the intialization of the plugin to fail.
 
   5) At that point if PLUGIN's :options have been set correctly, we try
-     to call :init-fn of PLUGIN if specified.  If no exception is thrown,
-     we reply to lightningd that's everything's OK on our side and that
-     we are ready to receive incoming requests.  If not, we disable
-     the plugin with a JSON RPC response whose \"result\" field contains
-     a \"disable\" field with a message reporting the exception."
+     to call :init-fn of PLUGIN if specified:
+
+     - If no exception is thrown, we return a JSON RPC response (as Clojure
+       map) with :result field set to {},
+     - If not, we return a JSON RPC response (as Clojure map) with
+       :result field containing a :disable field set to a message
+       reporting the exception."
   [req plugin]
   (let [dir (get-in req [:params :configuration :lightning-dir])
         rpc-file (get-in req [:params :configuration :rpc-file])
@@ -582,11 +584,8 @@
                           (catch clojure.lang.ExceptionInfo e {:disable (ex-message e)})
                           (catch Exception e {:disable (exception e)}))
           true {:disable (format ":init-fn must be a function not '%s' which is an instance of '%s'"
-                                 init-fn (class init-fn))})
-        resp (assoc {:jsonrpc "2.0" :id (:id req)} :result ok-or-disable)]
-    (json/write resp out :escape-slash false)
-    (. out (append "\n\n")) ;; required by lightningd
-    (. out (flush))))
+                                 init-fn (class init-fn))})]
+    {:jsonrpc "2.0" :id (:id req) :result ok-or-disable}))
 
 (defn notif
   "Return a METHOD notification with PARAMS to be send to lightningd.
@@ -1084,15 +1083,16 @@
     ;; We test this in test_subscriptions_and_notifications.
     (loop [req (read in)]
       (cond
+        ;; init request
         (and (:id req) (= (:method req) "init"))
-        (do
-          (await resps) ;; in case we're writing to out when handling notifications
-          (process-init! req plugin))
-        (:id req) (throw (ex-info (format "Expect 'init' request but received %s" req) {}))
+        (let [resp (process-init! req plugin)]
+          (send resps write [[req resp]] out))
         ;; this is a notification
-        true (let [[log-msgs resp] (process req plugin)]
-               (doseq [msg log-msgs] (log msg "debug" plugin))
-               (recur (read in)))))
+        (nil? (:id req))
+        (let [[log-msgs resp] (process req plugin)]
+          (doseq [msg log-msgs] (log msg "debug" plugin))
+          (recur (read in)))
+        true (throw (ex-info (format "Expect 'init' request but received %s" req) {}))))
 
     ;; read incoming requests and queue them
     (thread
