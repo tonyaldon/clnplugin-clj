@@ -84,7 +84,7 @@
 (defn gm-options
   "Return the vector of plugin options meant to be used in the getmanifest response.
 
-  See `gm-option` and `process-getmanifest!`."
+  See `gm-option` and `gm-resp`."
   [options]
   (mapv gm-option (seq options)))
 
@@ -205,7 +205,7 @@
     \"description\" fields.  If we don't specify them in map of [kw map]
     elements of RPCMETHODS, they will be set to the empty string \"\".
 
-  See `gm-resp`, `process-getmanifest!` and `process`."
+  See `gm-resp` and `process`."
   [rpcmethods]
   (let [f (fn [[kw-name method]]
             (let [;; methods defined in lightning with: AUTODATA(json_command,...);
@@ -257,7 +257,7 @@
   or `notify-progress` functions without adding the notification topics \"log\",
   \"message\" and \"progress\" to :notifications vector of the plugin's definition.
 
-  See `gm-resp`, `process-getmanifest!` and `notify`."
+  See `gm-resp` and `notify`."
   [notifications]
   (when notifications
     (let [f (fn [topic]
@@ -342,23 +342,9 @@
   the state of our plugin, we can access lightningd configuration
   like this:
 
-      (get-in @plugin [:init :configuration])
-
-  See `process-getmanifest!` and `process-init!`."
+      (get-in @plugin [:init :configuration])"
   [req plugin]
   (swap! plugin assoc (keyword (:method req)) (:params req)))
-
-(defn process-getmanifest!
-  "Process \"getmanifest\" REQ request received from lightningd.
-
-  We store that REQ in PLUGIN and send back to lightingd the response
-  produced by `gm-resp`."
-  [req plugin]
-  (let [out (:_out @plugin)]
-    (add-request! req plugin)
-    (json/write (gm-resp req plugin) out :escape-slash false)
-    (. out (append "\n\n")) ;; required by lightningd
-    (. out (flush))))
 
 (defn exception
   "Return exception E converted into a string."
@@ -566,7 +552,6 @@
         rpc-file (get-in req [:params :configuration :rpc-file])
         socket-file (str (clojure.java.io/file dir rpc-file))
         options (get-in req [:params :options])
-        out (:_out @plugin)
         _ (add-request! req plugin)
         _ (swap! plugin assoc-in [:rpcmethods :setconfig] {:fn setconfig!}) ;; For dynamic options
         _ (swap! plugin assoc-in [:socket-file] socket-file)
@@ -1065,11 +1050,14 @@
         reqs-in-progress (atom 0)]
 
     (set-defaults! plugin)
-    (swap! plugin assoc :_out out) ;; for process-getmanifest!, process-init!, log and notify
-    (swap! plugin assoc :_resps resps) ;; for log and notify
+    ;; for log and notify functions
+    (swap! plugin assoc :_out out)
+    (swap! plugin assoc :_resps resps)
 
     ;; getmanifest round
-    (process-getmanifest! (read in) plugin)
+    (let [req (read in) resp (gm-resp req plugin)]
+      (add-request! req plugin)
+      (send resps write [[req resp]] out))
 
     ;; init round
     ;;

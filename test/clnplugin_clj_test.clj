@@ -432,23 +432,6 @@
                  :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                  :rpc-file "lightning-rpc"}}})))
 
-(deftest process-getmanifest!-test
-  (let [plugin (atom {:options {:opt 'opt}
-                      :rpcmethods {:foo {:fn (fn [params req plugin])}}
-                      :dynamic true
-                      :_out (new java.io.StringWriter)})
-        req {:jsonrpc "2.0" :id 0 :method "getmanifest" :params {:allow-deprecated-apis false}}]
-    (plugin/process-getmanifest! req plugin)
-    (is (= (json/read-str (str (:_out @plugin)) :key-fn keyword)
-           {:jsonrpc "2.0"
-            :id 0
-            :result {:options [{:name "opt" :type "string" :description ""}]
-                     :rpcmethods [{:name "foo" :usage "" :description ""}]
-                     :dynamic true}}))
-    (is (=
-         (:getmanifest @plugin)
-         {:allow-deprecated-apis false}))))
-
 (deftest get-option-test
   (let [plugin (atom {:options
                       {:foo-1 nil
