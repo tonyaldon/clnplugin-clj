@@ -963,13 +963,14 @@
         jsonrpc {:jsonrpc "2.0" :id req-id}]
     (try
       ;; nil because nothing to log
-      [nil (merge jsonrpc {:result (method-fn (:params req) req plugin)})]
+      [nil (let [resp (merge jsonrpc {:result (method-fn (:params req) req plugin)})]
+             (when req-id resp))]
       (catch clojure.lang.ExceptionInfo e
         (let [error (merge {:code -32603 :message msg} (:error (ex-data e)))]
-          [[msg (format "%s" error)] (merge jsonrpc {:error error})]))
+          [[msg (format "%s" error)] (when req-id (merge jsonrpc {:error error}))]))
       (catch Throwable e
         [[msg (exception e)]
-         (merge jsonrpc {:error {:code -32603 :message msg :exception (exception e)}})]))))
+         (when req-id (merge jsonrpc {:error {:code -32603 :message msg :exception (exception e)}}))]))))
 
 (defn read
   "Read one lightningd JSON-RPC request from IN.
@@ -1077,7 +1078,7 @@
           (send resps write [[req resp]] out))
         ;; this is a notification
         (nil? (:id req))
-        (let [[log-msgs resp] (process req plugin)]
+        (let [[log-msgs _] (process req plugin)]
           (doseq [msg log-msgs] (log msg "debug" plugin))
           (recur (read in)))
         true (throw (ex-info (format "Expect 'init' request but received %s" req) {}))))
@@ -1105,7 +1106,7 @@
             (try
               (let [[log-msgs resp] (process req plugin)]
                 (doseq [msg log-msgs] (log msg "debug" plugin))
-                (send resps write [[req resp]] out))
+                (when resp (send resps write [[req resp]] out)))
               (finally (swap! reqs-in-progress dec))))
           (recur))
         (recur)))))

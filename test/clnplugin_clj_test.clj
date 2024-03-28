@@ -1271,9 +1271,9 @@
         req-0 {:jsonrpc "2.0" :method "foo-0" :params {}}
         req-1 {:jsonrpc "2.0" :method "foo-1" :params {:bar-1 "baz-1"}}
         req-2 {:jsonrpc "2.0" :method "foo-2" :params {}}]
-    (plugin/process req-0 plugin)
-    (plugin/process req-1 plugin)
-    (plugin/process req-2 plugin)
+    (is (= [nil nil] (plugin/process req-0 plugin)))
+    (is (= [nil nil] (plugin/process req-1 plugin)))
+    (is (= [nil nil] (plugin/process req-2 plugin)))
     (is (= (:foo-0 @plugin) "bar-0"))
     (is (= (:foo-1 @plugin) {:bar-1 "baz-1"}))
     (is (= (:* @plugin) ["all" "foo-2"])))
@@ -1281,7 +1281,8 @@
   ;; subscription error - receive a notification with no corresponding subscription
   (let [plugin (atom {:subscriptions {}})
         req {:jsonrpc "2.0" :method "foo" :params {}}
-        [log-msgs _] (plugin/process req plugin)]
+        [log-msgs resp] (plugin/process req plugin)]
+    (is (= resp nil))
     (is (re-find #"Error while processing.*method.*foo" (first log-msgs)))
     (is (re-find #":cause.*Cannot.*invoke.*clojure.lang.IFn.invoke.*because.*method_fn.*is.*null" (second log-msgs)))))
 
