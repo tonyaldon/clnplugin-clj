@@ -191,6 +191,11 @@
        Throwable
        #"You cannot define ':getinfo' method which is already a lightningd internal method."
        (plugin/gm-rpcmethods {:getinfo {}})))
+  ;; cannot declare methods which are already lightningd hooks
+  (is (thrown-with-msg?
+       Throwable
+       #"You cannot define ':peer_connected' method which is already a lightningd hook."
+       (plugin/gm-rpcmethods {:peer_connected {}})))
   ;; :fn is not defined
   (is (thrown-with-msg?
        Throwable
@@ -269,6 +274,38 @@
        #"Error in ':foo' notification topic in :subscriptions map.  :fn must be a function not 'some-symbol' which is an instance of 'class clojure.lang.Symbol'"
        (plugin/gm-subscriptions {:foo {:fn 'some-symbol}}))))
 
+(deftest gm-hooks-test
+  (is (= (plugin/gm-hooks nil) nil))
+  (is (= (plugin/gm-hooks
+          {:foo-0 {:fn (fn [params req plugin])}
+           :foo-1 {:before ["bar-1" "baz-1"]
+                   :fn (fn [params req plugin])}
+           :foo-2 {:after ["bar-2" "baz-2"]
+                   :fn (fn [params req plugin])}
+           :foo-3 {:before ["bar-3"]
+                   :after ["baz-3"]
+                   :fn (fn [params req plugin])}})
+         [{:name "foo-0"}
+          {:name "foo-1" :before ["bar-1" "baz-1"]}
+          {:name "foo-2" :after ["bar-2" "baz-2"]}
+          {:name "foo-3" :before ["bar-3"] :after ["baz-3"]}]))
+
+  ;; :fn is not defined
+  (is (thrown-with-msg?
+       Throwable
+       #":fn is not defined for ':foo' hook :hooks map."
+       (plugin/gm-hooks {:foo {}})))
+  ;; error because :fn is not a function
+  (is (thrown-with-msg?
+       Throwable
+       #"Error in ':foo' hook in :hooks map.  :fn must be a function not '\[:a-vector \"is not a function\"\]' which is an instance of 'class clojure.lang.PersistentVector'"
+       (plugin/gm-hooks {:foo {:fn [:a-vector "is not a function"]}})))
+  ;; error because :fn is not a function (we don't allow symbol as value of :fn)
+  (is (thrown-with-msg?
+       Throwable
+       #"Error in ':foo' hook in :hooks map.  :fn must be a function not 'some-symbol' which is an instance of 'class clojure.lang.Symbol'"
+       (plugin/gm-hooks {:foo {:fn 'some-symbol}}))))
+
 (deftest gm-resp-test
   ;; defaults
   (is (= (let [plugin (atom {:options {}
@@ -293,7 +330,7 @@
           :result {:options []
                    :rpcmethods []
                    :dynamic false}}))
-  ;; options, rpcmethods, subscriptions and notifications not empty
+  ;; options, rpcmethods, subscriptions, notifications and hooks not empty
   (is (= (let [plugin
                (atom {:options {:foo-1 nil
                                 :foo-2 {:type "string"
@@ -315,6 +352,14 @@
                       :subscriptions {:foo-0 {:fn (fn [params req plugin])}
                                       :foo-1 {:fn (fn [params req plugin])}
                                       :foo-2 {:fn (fn [params req plugin])}}
+                      :hooks {:foo-0 {:fn (fn [params req plugin])}
+                              :foo-1 {:before ["bar-1" "baz-1"]
+                                      :fn (fn [params req plugin])}
+                              :foo-2 {:after ["bar-2" "baz-2"]
+                                      :fn (fn [params req plugin])}
+                              :foo-3 {:before ["bar-3"]
+                                      :after ["baz-3"]
+                                      :fn (fn [params req plugin])}}
                       :notifications ["topic-1" "topic-2" "topic-3"]
                       :dynamic true})
                req {:id 16}]
@@ -340,6 +385,10 @@
                                 {:name "foo-3" :usage "" :description "description-3"}
                                 {:name "foo-4" :usage "usage-4" :description "description-4"}]
                    :subscriptions ["foo-0" "foo-1" "foo-2"]
+                   :hooks [{:name "foo-0"}
+                           {:name "foo-1" :before ["bar-1" "baz-1"]}
+                           {:name "foo-2" :after ["bar-2" "baz-2"]}
+                           {:name "foo-3" :before ["bar-3"] :after ["baz-3"]}]
                    :notifications [{:method "topic-1"} {:method "topic-2"} {:method "topic-3"}]
                    :dynamic true}}))
   ;; error because :fn is not a function for foo rpcmethod
@@ -351,7 +400,7 @@
                            :dynamic true})
              req {:id 16}]
          (plugin/gm-resp req plugin))))
-  ;; error because :fn is not a function for foo notification topic
+  ;; error because :fn is not a function for foo subscription
   (is (thrown-with-msg?
        Throwable
        #"Error in ':foo' notification topic in :subscriptions map.  :fn must be a function not '\[:a-vector \"is not a function\"\]' which is an instance of 'class clojure.lang.PersistentVector'"
@@ -359,6 +408,16 @@
                            :rpcmethods {}
                            :dynamic true
                            :subscriptions {:foo {:fn [:a-vector "is not a function"]}}})
+             req {:id 16}]
+         (plugin/gm-resp req plugin))))
+  ;; error because :fn is not a function for foo hook
+  (is (thrown-with-msg?
+       Throwable
+       #"Error in ':foo' hook in :hooks map.  :fn must be a function not '\[:a-vector \"is not a function\"\]' which is an instance of 'class clojure.lang.PersistentVector'"
+       (let [plugin (atom {:options {}
+                           :rpcmethods {}
+                           :dynamic true
+                           :hooks (plugin/gm-hooks {:foo {:fn [:a-vector "is not a function"]}})})
              req {:id 16}]
          (plugin/gm-resp req plugin))))
   ;; "log", "message", "progress" notifications not to be declared
@@ -1271,9 +1330,9 @@
         req-0 {:jsonrpc "2.0" :method "foo-0" :params {}}
         req-1 {:jsonrpc "2.0" :method "foo-1" :params {:bar-1 "baz-1"}}
         req-2 {:jsonrpc "2.0" :method "foo-2" :params {}}]
-    (is (= [nil nil] (plugin/process req-0 plugin)))
-    (is (= [nil nil] (plugin/process req-1 plugin)))
-    (is (= [nil nil] (plugin/process req-2 plugin)))
+    (is (= (plugin/process req-0 plugin) [nil nil]))
+    (is (= (plugin/process req-1 plugin) [nil nil]))
+    (is (= (plugin/process req-2 plugin) [nil nil]))
     (is (= (:foo-0 @plugin) "bar-0"))
     (is (= (:foo-1 @plugin) {:bar-1 "baz-1"}))
     (is (= (:* @plugin) ["all" "foo-2"])))
@@ -1284,6 +1343,22 @@
         [log-msgs resp] (plugin/process req plugin)]
     (is (= resp nil))
     (is (re-find #"Error while processing.*method.*foo" (first log-msgs)))
+    (is (re-find #":cause.*Cannot.*invoke.*clojure.lang.IFn.invoke.*because.*method_fn.*is.*null" (second log-msgs))))
+
+  ;; hooks
+  (let [plugin (atom {:hooks
+                      {:some-hook {:fn (fn [params req plugin] {:result "continue"})}}})
+        req {:jsonrpc "2.0" :id "some-id" :method "some-hook" :params {}}]
+    (is (= (second (plugin/process req plugin)) {:jsonrpc "2.0" :id "some-id" :result {:result "continue"}})))
+
+  ;; hook error - receive a notification with no corresponding subscription
+  (let [plugin (atom {:hooks {}})
+        req {:jsonrpc "2.0" :id "some-id" :method "peer_connected" :params {}}
+        [log-msgs resp] (plugin/process req plugin)]
+    (is (= (get-in resp [:error :code]) -32603))
+    (is (re-find #"Error while processing.*method.*peer_connected"
+                 (get-in resp [:error :message])))
+    (is (re-find #"Error while processing.*method.*peer_connected" (first log-msgs)))
     (is (re-find #":cause.*Cannot.*invoke.*clojure.lang.IFn.invoke.*because.*method_fn.*is.*null" (second log-msgs)))))
 
 (deftest read-test

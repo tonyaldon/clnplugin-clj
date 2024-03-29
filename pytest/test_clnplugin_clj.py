@@ -49,6 +49,9 @@ def test_getmanifest(node_factory):
     plugin = os.path.join(os.getcwd(), "getmanifest_notifications_do_not_declare_log")
     with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
         l1.rpc.plugin_start(plugin)
+    plugin = os.path.join(os.getcwd(), "getmanifest_peer_connected_hook")
+    with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
+        l1.rpc.plugin_start(plugin)
 
 
 def test_init(node_factory):
@@ -395,3 +398,27 @@ def test_async(node_factory, executor):
     assert delta > 2
     # ensure at 2 `sleep-and-update-counter` request processed at the same time
     assert delta < 3
+
+
+def test_hooks_peer_connected(node_factory):
+    plugins = [os.path.join(os.getcwd(), "hooks_peer_connected_foo"),
+               os.path.join(os.getcwd(), "hooks_peer_connected_bar"),
+               os.path.join(os.getcwd(), "hooks_peer_connected_baz")]
+    l1 = node_factory.get_node(options={"plugin": plugins})
+    l2 = node_factory.get_node()
+    l2.rpc.connect(l1.info['id'], 'localhost', l1.port)
+
+    l1.daemon.wait_for_log("plugin-hooks_peer_connected_foo: timestamp:")
+    line_foo = l1.daemon.is_in_log('plugin-hooks_peer_connected_foo: timestamp:')
+    timestamp_foo = int(re.search(r'timestamp: ([0-9]*)', line_foo).group(1))
+    line_bar = l1.daemon.is_in_log('plugin-hooks_peer_connected_bar: timestamp:')
+    timestamp_bar = int(re.search(r'timestamp: ([0-9]*)', line_bar).group(1))
+    line_baz = l1.daemon.is_in_log('plugin-hooks_peer_connected_baz: timestamp:')
+    timestamp_baz = int(re.search(r'timestamp: ([0-9]*)', line_baz).group(1))
+
+    # peer_connected is a chained hook and plugins hooks_peer_connected_foo,
+    # hooks_peer_connected_bar and hooks_peer_connected_baz register to it and
+    # are called in chained, foo first then bar then baz.  They all log a timestamp
+    # and return {"result": "continue"}.
+    # So we must have the following to be true
+    assert timestamp_foo < timestamp_bar < timestamp_baz

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+cd /home/tony/work/projects/clnplugin-clj/pytest/plugins/
+clojure -M hooks_peer_connected_baz.clj

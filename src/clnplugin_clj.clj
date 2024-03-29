@@ -210,6 +210,8 @@
   (let [f (fn [[kw-name method]]
             (let [;; methods defined in lightning with: AUTODATA(json_command,...);
                   lightningd-internal-methods '(:addgossip :addpsbtoutput :batching :blacklistrune :blindedpath :check :checkmessage :checkrune :close :connect :createinvoice :createinvrequest :createoffer :createonion :creatrune :datastore :datastoreusage :decodepay :deldatastore :delexpiredinvoice :delforward :delinvoice :delpay :deprecations :destroyrune :dev :dev-fail :dev-feerate :dev-forget-channel :dev-gossip-set-time :dev-ignore-htlcs :dev-listaddrs :dev-memdump :dev-memleak :dev-queryrates :dev-quiesce :dev-reenable-commit :dev-report-fds :dev-rescan-output :dev-set-max-scids-encode-size :dev-sign-last-tx :dev-suppress-gossip :disableinvoicerequest :disableoffer :disconnect :feerates :fundchannel_cancel :fundchannel_complete :fundchannel_start :fundpsbt :getinfo :getlog :help :invoice :invokerune :listclosedchannels :listconfigs :listdatastore :listforwards :listfunds :listhtlcs :listinvoicerequests :listinvoices :listoffers :listpeerchannels :listpeers :listsendpays :listtransactions :makesecret :newaddr :notifications :openchannel_abort :openchannel_bump :openchannel_init :openchannel_signed :openchannel_update :parsefeerate :payersign :ping :plugin :preapproveinvoice :preapprovekeysend :recover :recoverchannel :reserveinputs :sendcustommsg :sendonion :sendonionmessage :sendpay :sendpsbt :setchannel :setconfig :setleaserates :setpsbtversion :showrunes :signinvoice :signmessage :signpsbt :splice_init :splice_signed :splice_update :staticbackup :stop :unreserveinputs :utxopsbt :wait :waitanyinvoice :waitblockheight :waitinvoice :waitsendpay)
+                  ;; hooks defined in lightning with: REGISTER_PLUGIN_HOOK(...);
+                  lightningd-hooks '(:commitment_revocation :custommsg :htlc_accepted :invoice_payment :onion_message_recv :openchannel :openchannel2 :openchannel2_changed :openchannel2_sign :peer_connected :rbf_channel :recover :rpc_command)
                   method-fn (:fn method)]
               (cond
                 ;; throw an error if we try to define a method already registered
@@ -218,6 +220,11 @@
                 ;; is not the case for methods already defined in another plugin.
                 (some #(= kw-name %) lightningd-internal-methods)
                 (throw (ex-info (format "You cannot define '%s' method which is already a lightningd internal method."
+                                        kw-name) {}))
+                ;; throw an error if we try to define a method already defined
+                ;; as a hook.
+                (some #(= kw-name %) lightningd-hooks)
+                (throw (ex-info (format "You cannot define '%s' method which is already a lightningd hook."
                                         kw-name) {}))
                 (nil? method-fn)
                 (throw (ex-info (format ":fn is not defined for '%s' RPC method"
@@ -289,6 +296,23 @@
         ;; notification topics.
         (if (some #(= % "*") subs) ["*"] subs)))))
 
+(defn gm-hooks
+  "..."
+  [hooks]
+  (when hooks
+    (let [f (fn [[kw-name {:keys [before after fn]}]]
+              (cond
+                (nil? fn)
+                (throw (ex-info (format ":fn is not defined for '%s' hook :hooks map."
+                                        kw-name) {}))
+                (not (fn? fn))
+                (throw (ex-info (format "Error in '%s' hook in :hooks map.  :fn must be a function not '%s' which is an instance of '%s'"
+                                        kw-name fn (class fn)) {})))
+              (merge {:name (name kw-name)}
+                     (when before {:before before})
+                     (when after {:after after})))]
+      (mapv f (seq hooks)))))
+
 (defn gm-resp
   "Return the response to the getmanifest REQ.
 
@@ -321,6 +345,8 @@
              :dynamic (:dynamic p)}
             (when-let [subscriptions (gm-subscriptions (:subscriptions p))]
               {:subscriptions subscriptions})
+            (when-let [hooks (gm-hooks (:hooks p))]
+              {:hooks hooks})
             (when-let [notifications (gm-notifications (:notifications p))]
               {:notifications notifications}))}))
 
@@ -955,7 +981,8 @@
   (let [req-id (:id req)
         method (keyword (:method req))
         method-fn (if req-id
-                    (get-in (:rpcmethods @plugin) [method :fn])
+                    (get-in (merge (:rpcmethods @plugin) (:hooks @plugin))
+                            [method :fn])
                     (when-let [subs (:subscriptions @plugin)]
                       (or (get-in subs [method :fn])
                           (get-in subs [:* :fn]))))
