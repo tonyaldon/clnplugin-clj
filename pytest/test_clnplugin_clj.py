@@ -3,10 +3,12 @@ from pyln.client import RpcError
 import os
 import subprocess
 import time
+import re
 
+os.chdir("pytest/plugins")
 
 def test_rpcmethods(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/rpcmethods")
+    plugin = os.path.join(os.getcwd(), "rpcmethods")
     l1 = node_factory.get_node(options={"plugin": plugin})
     assert l1.rpc.call("foo-0") == {"bar": "baz"}
     assert l1.rpc.call("foo-1", {"baz-1": "baz-1"}) == {"bar-1": "baz-1"}
@@ -29,28 +31,28 @@ def test_rpcmethods(node_factory):
 
 def test_getmanifest(node_factory):
     l1 = node_factory.get_node()
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_options_mutli_dynamic")
+    plugin = os.path.join(os.getcwd(), "getmanifest_options_mutli_dynamic")
     with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
         l1.rpc.plugin_start(plugin)
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_getinfo_internal_method")
+    plugin = os.path.join(os.getcwd(), "getmanifest_getinfo_internal_method")
     with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
         l1.rpc.plugin_start(plugin)
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_fn_not_defined")
+    plugin = os.path.join(os.getcwd(), "getmanifest_fn_not_defined")
     with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
         l1.rpc.plugin_start(plugin)
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_fn_not_a_function")
+    plugin = os.path.join(os.getcwd(), "getmanifest_fn_not_a_function")
     with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
         l1.rpc.plugin_start(plugin)
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_fn_symbol_not_a_function")
+    plugin = os.path.join(os.getcwd(), "getmanifest_fn_symbol_not_a_function")
     with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
         l1.rpc.plugin_start(plugin)
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/getmanifest_notifications_do_not_declare_log")
+    plugin = os.path.join(os.getcwd(), "getmanifest_notifications_do_not_declare_log")
     with pytest.raises(RpcError, match=r"exited before replying to getmanifest"):
         l1.rpc.plugin_start(plugin)
 
 
 def test_init(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/init")
+    plugin = os.path.join(os.getcwd(), "init")
     l1 = node_factory.get_node(options={"plugin": plugin,
                                         "foo": "FOO",
                                         "bar": "BAR"})
@@ -62,41 +64,41 @@ def test_init(node_factory):
     assert l1.rpc.call("get-plugin-options-values") == {"foo": "foo-plugin-restarted",
                                                         "bar": "bar-plugin-restarted"}
 
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_check_opt")
+    plugin = os.path.join(os.getcwd(), "init_disable_check_opt")
     with pytest.raises(RpcError, match=r"Wrong option 'foo_1'"):
         l1.rpc.plugin_start(plugin, foo_1="foo-value")
 
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_check_opt_before_init_fn")
+    plugin = os.path.join(os.getcwd(), "init_disable_check_opt_before_init_fn")
     with pytest.raises(RpcError, match=r"Wrong option 'foo_2'"):
         l1.rpc.plugin_start(plugin, foo_2="foo-value")
 
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_check_opt_not_a_function")
+    plugin = os.path.join(os.getcwd(), "init_disable_check_opt_not_a_function")
     with pytest.raises(RpcError, match=r":check-opt of.*foo_3.*option must be a function not.*[:a-vector \"is not a function\"].*which is an instance of.*class clojure.lang.PersistentVector"):
         l1.rpc.plugin_start(plugin, foo_3="foo-value")
 
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_check_opt_symbol_not_a_function")
+    plugin = os.path.join(os.getcwd(), "init_disable_check_opt_symbol_not_a_function")
     with pytest.raises(RpcError, match=r":check-opt of.*foo_.*option must be a function not .*some-symbol.*which is an instance of.*class clojure.lang.Symbol"):
         l1.rpc.plugin_start(plugin, foo_4="foo-value")
 
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_check_opt_execution_error")
+    plugin = os.path.join(os.getcwd(), "init_disable_check_opt_execution_error")
     with pytest.raises(RpcError, match=r":check-opt of.*foo_5.* option thrown the following exception when called with.*foo-value.*value: #error.*:cause.*Divide by zero.*:type.*java.lang.ArithmeticException"):
         l1.rpc.plugin_start(plugin, foo_5="foo-value")
 
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_init_fn_not_a_function")
+    plugin = os.path.join(os.getcwd(), "init_disable_init_fn_not_a_function")
     with pytest.raises(RpcError, match=r":init-fn must be a function"):
         l1.rpc.plugin_start(plugin)
 
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_init_fn_execution_error")
+    plugin = os.path.join(os.getcwd(), "init_disable_init_fn_execution_error")
     with pytest.raises(RpcError, match=r"#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"):
         l1.rpc.plugin_start(plugin)
 
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/init_disable_init_fn")
+    plugin = os.path.join(os.getcwd(), "init_disable_init_fn")
     with pytest.raises(RpcError, match=r"disabled by user"):
         l1.rpc.plugin_start(plugin)
 
 
 def test_plugin_process_killed_after_we_shutdown_lightningd(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/plugin_process_killed_after_we_shutdown_lightningd")
+    plugin = os.path.join(os.getcwd(), "plugin_process_killed_after_we_shutdown_lightningd")
     l1 = node_factory.get_node(options={"plugin": plugin})
     line = l1.daemon.is_in_log(r'.*started\([0-9]*\).*plugins/plugin_process_killed_after_we_shutdown_lightningd')
     pidstr = re.search(r'.*started\(([0-9]*)\).*plugins/plugin_process_killed_after_we_shutdown_lightningd', line).group(1)
@@ -114,7 +116,7 @@ def test_plugin_process_killed_after_we_shutdown_lightningd(node_factory):
 
 
 def test_options_deprecated(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/options_deprecated")
+    plugin = os.path.join(os.getcwd(), "options_deprecated")
 
     l1 = node_factory.get_node(options={'allow-deprecated-apis': False})
     with pytest.raises(RpcError, match=r"deprecated option"):
@@ -128,7 +130,7 @@ def test_options_deprecated(node_factory):
 
 
 def test_options_dynamic(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/options_dynamic")
+    plugin = os.path.join(os.getcwd(), "options_dynamic")
     l1 = node_factory.get_node(options={"plugin": plugin})
 
     # foo-no-check-opt
@@ -211,7 +213,7 @@ def test_options_dynamic(node_factory):
 
 
 def test_log(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/log")
+    plugin = os.path.join(os.getcwd(), "log")
     l1 = node_factory.get_node(options={"plugin": plugin})
     l1.rpc.call("log-info")
     assert l1.daemon.is_in_log(r"INFO.*logged by 'log-info'")
@@ -224,8 +226,8 @@ def test_log(node_factory):
 
 
 def test_subscriptions_and_notifications(node_factory):
-    plugins = [os.path.join(os.getcwd(), "pytest/plugins/subscriptions"),
-               os.path.join(os.getcwd(), "pytest/plugins/notifications")]
+    plugins = [os.path.join(os.getcwd(), "subscriptions"),
+               os.path.join(os.getcwd(), "notifications")]
     l1 = node_factory.get_node(options={"plugin": plugins})
 
     l1.rpc.call("notify-topic-0")
@@ -256,7 +258,7 @@ def test_subscriptions_and_notifications(node_factory):
     #
     # before receiving the init request.
     # Here we test that we take this fact into account!
-    plugin_subscriptions_all = os.path.join(os.getcwd(), "pytest/plugins/subscriptions_all")
+    plugin_subscriptions_all = os.path.join(os.getcwd(), "subscriptions_all")
     l1.rpc.plugin_start(plugin_subscriptions_all)
     l1.daemon.wait_for_log(r"plugin-subscriptions_all: Got a warning notification before the init request:.*topic-undeclared-0")
     l1.daemon.wait_for_log(r"plugin-subscriptions_all: Got a warning notification before the init request:.*topic-undeclared-1")
@@ -273,12 +275,10 @@ def test_subscriptions_and_notifications(node_factory):
 
 
 def test_notifications_message_progress(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/notifications_message_progress")
+    plugin = os.path.join(os.getcwd(), "notifications_message_progress")
     l1 = node_factory.get_node(options={"plugin": plugin})
     l1_info = l1.rpc.getinfo()
     l1_socket_file = os.path.join(l1_info["lightning-dir"], "lightning-rpc")
-
-    os.chdir("pytest/plugins")
 
     # Call send-message-notifications defined in notifications_message_progress.clj plugin.
     # Accumulate in an vector the 3 notifications queued in a channel
@@ -319,7 +319,7 @@ def test_notifications_message_progress(node_factory):
 
 
 def test_errors(node_factory):
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/errors")
+    plugin = os.path.join(os.getcwd(), "errors")
     l1 = node_factory.get_node(options={"plugin": plugin})
     with pytest.raises(RpcError, match=r"custom-error"):
         l1.rpc.call("custom-error")
@@ -346,7 +346,7 @@ def test_async(node_factory, executor):
     # to pass
 
     # max-parallel-reqs not specified in plugin so default to 512
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/async")
+    plugin = os.path.join(os.getcwd(), "async")
     l1 = node_factory.get_node(options={"plugin": plugin})
     start_time = time.time()
     # each call takes about 1 second
@@ -363,7 +363,7 @@ def test_async(node_factory, executor):
 
     # max-parallel-reqs set to 1 which makes plugin to process
     # lightningd requests synchronously
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/async_sync")
+    plugin = os.path.join(os.getcwd(), "async_sync")
     l1 = node_factory.get_node(options={"plugin": plugin})
     start_time = time.time()
     # each call takes about 1 second
@@ -379,7 +379,7 @@ def test_async(node_factory, executor):
     assert delta > 3.0
 
     # max-parallel-reqs set to 2
-    plugin = os.path.join(os.getcwd(), "pytest/plugins/async_max_parallel_reqs")
+    plugin = os.path.join(os.getcwd(), "async_max_parallel_reqs")
     l1 = node_factory.get_node(options={"plugin": plugin})
     start_time = time.time()
     # each call takes about 1 second
