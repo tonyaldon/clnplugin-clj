@@ -1,0 +1,10 @@
+{
+ ;; :paths ["."]
+ :deps
+ ;; {clnplugin-clj/clnplugin-clj {:local/root "../../.."}
+ {clnplugin-clj/clnplugin-clj {:local/root "../../.."}
+  }
+ :aliases
+ {:build {:deps {io.github.clojure/tools.build {:mvn/version "0.9.6"}
+                 babashka/fs {:mvn/version "0.5.20"}}
+          :ns-default build}}}

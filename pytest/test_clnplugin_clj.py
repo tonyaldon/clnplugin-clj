@@ -422,3 +422,10 @@ def test_hooks_peer_connected(node_factory):
     # and return {"result": "continue"}.
     # So we must have the following to be true
     assert timestamp_foo < timestamp_bar < timestamp_baz
+
+
+def test_java(node_factory):
+    os.popen("cd plugins/java && clojure -T:build plugin").read()
+    plugin = os.path.join(os.getcwd(), "plugins/java/target/myplugin")
+    l1 = node_factory.get_node(options={"plugin": plugin})
+    assert l1.rpc.call("foo") == {"bar": "baz"}
