@@ -1,0 +1,246 @@
+#!/usr/bin/env bb
+
+(def deps.edn
+  (format "{:deps
+  {%s
+   io.github.tonyaldon/clnrpc-clj {:git/tag \"v24.02\" :git/sha \"e5e57fa\"}}
+  :aliases
+  {:build {:deps {io.github.clojure/tools.build {:mvn/version \"0.9.6\"}
+                 babashka/fs {:mvn/version \"0.5.20\"}}
+          :ns-default build}}}"
+          (if (System/getenv "USE_LOCAL_CLNPLUGIN")
+            "clnplugin-clj/clnplugin-clj {:local/root \"..\"}"
+            "io.github.tonyaldon/clnplugin-clj {:git/tag \"v24.02\" :git/sha \"0000000\"}")))
+
+(def build.clj
+  "(ns build
+  (:require [clojure.tools.build.api :as b])
+  (:require [babashka.fs :as fs]))
+
+(def class-dir \"target/classes\")
+(def p \"target/myplugin\")
+(def uber-file \"target/myplugin.jar\")
+(def p-jar (str (fs/file (fs/cwd) uber-file)))
+
+(defn clean [_]
+  (b/delete {:path \"target\"}))
+
+(defn plugin [_]
+  (let [basis (b/create-basis {:project \"deps.edn\"})]
+    (clean nil)
+    (b/copy-dir {:src-dirs [\"src\"]
+                 :target-dir class-dir})
+    (b/compile-clj {:class-dir class-dir
+                    :basis basis
+                    :ns-compile '[myplugin]})
+    (b/uber {:class-dir class-dir
+             :basis basis
+             :uber-file uber-file
+             :main 'myplugin})
+    (spit p (str \"#!/usr/bin/env -S java -jar \" p-jar))
+    (b/process {:command-args [\"chmod\" \"+x\" p]})))
+")
+
+(def src-myplugin.clj
+  "(ns myplugin
+  (:require [clnplugin-clj :as plugin])
+  (:require [clnrpc-clj :as rpc])
+  (:gen-class))
+
+(def plugin
+  (atom {:options {:my-opt {:type \"string\"
+                            :description \"some description\"
+                            :default \"my-opt-default\"}
+                   :my-opt-multi {:type \"string\"
+                                  :multi true}
+                   :my-opt-dynamic {:type \"int\"
+                                    :dynamic true}}
+         :rpcmethods
+         {:my-foo {:fn (fn [params req plugin] {:bar \"baz\"})}
+          :my-options
+          {:fn (fn [params req plugin]
+                 ;; We can get the current value of an option using `plugin/get-option`
+                 ;; function:
+                 ;;
+                 ;; 1) if the option doesn't exist, return nil,
+                 ;; 2) if the option exists but has not been set by the user,
+                 ;;    return :default if defined or nil,
+                 ;; 3) if the option has been set by the user (at startup or
+                 ;;    dynamicaly with setconfig lightningd command) return
+                 ;;    user's value,
+                 ;; 4) if the option is :multi, the current value if it exists
+                 ;;    is always a vector.
+                 ;;
+                 ;; Note that options cannot be multi and dynamic at the same time.
+                 ;;
+                 ;; Assuming we started our plugin located at /path/to/myplugin like
+                 ;; this
+                 ;;
+                 ;;     l1-cli -k plugin \\
+                 ;;       subcommand=start \\
+                 ;;       plugin=/path/to/myplugin \\
+                 ;;       my-opt-multi=foo \\
+                 ;;       my-opt-multi=bar
+                 ;;
+                 ;; running the following command
+                 ;;
+                 ;;     lightning-cli my-options
+                 ;;
+                 ;; gives us:
+                 ;;
+                 ;;     {
+                 ;;       \"my-opt\": \"my-opt-default\",
+                 ;;       \"my-opt-multi\": [\"foo\", \"bar\"],
+                 ;;       \"my-opt-dynamic\": null
+                 ;;     }
+                 ;;
+                 ;; Now after setting my-opt-dynamic to 12 by running the following command
+                 ;;
+                 ;;     lightning-cli setconfig my-opt-dynamic 12
+                 ;;
+                 ;; we can see by running the following command again
+                 ;;
+                 ;;     lightning-cli my-options
+                 ;;
+                 ;; which gives us
+                 ;;
+                 ;;     {
+                 ;;       \"my-opt\": \"my-opt-default\",
+                 ;;       \"my-opt-multi\": [\"foo\", \"bar\"],
+                 ;;       \"my-opt-dynamic\": 12
+                 ;;     }
+                 ;;
+                 ;; that my-opt-dynamic option has been set to 12.
+                 {:my-opt (plugin/get-option plugin :my-opt)
+                  :my-opt-multi (plugin/get-option plugin :my-opt-multi)
+                  :my-opt-dynamic (plugin/get-option plugin :my-opt-dynamic)})}
+          :my-info
+          {:fn (fn [params req plugin]
+                 {;; We can get node's id by issuing a getinfo JSON RPC request
+                  ;; to our node using clnrpc-clj library:
+                  :id (:id (rpc/getinfo @plugin))
+                  ;; We can use listconfigs RPC method to check if we are
+                  ;; offline like this:
+                  :offline (-> (rpc/call @plugin \"listconfigs\")
+                               :configs :offline)
+                  ;; During plugin's startup, clnplugin-clj stored the params
+                  ;; of the init request in plugin's :init key.  So we can access
+                  ;; node's configuration like this:
+                  :config (get-in @plugin [:init :configuration])})}
+          :my-log
+          {:fn (fn [params req plugin]
+                 (let [;; When lightningd forwards a JSON RPC request received
+                       ;; from a client, \"params\" field can be a vector or an
+                       ;; object.  Running
+                       ;;
+                       ;;     lightning-cli my-log some-message debug
+                       ;;
+                       ;; will result in \"params\" field of the JSON RPC request to be
+                       ;;
+                       ;;     [\"some-message\" \"debug\"]
+                       ;;
+                       ;; and running
+                       ;;
+                       ;;     lightning-cli -k my-log message=some-message level=debug
+                       ;;
+                       ;; will result in \"params\" field of the JSON RPC request to be
+                       ;;
+                       ;;     {\"message\": \"some-message\", \"level\": \"debug\"}
+                       ;;
+                       ;; We can use the util function `plugin/params->map` to destructure
+                       ;; :fn's argument params as we do below.
+                       {:keys [message level]}
+                       (plugin/params->map [:message :level] params)]
+                   ;; We can use `plugin/log` to log messages to lightningd's log file.
+                   ;; So, running the following command
+                   ;;
+                   ;;     lightning-cli my-log
+                   ;;
+                   ;; will log something like this
+                   ;;
+                   ;;     2024-03-31T06:31:11.631Z INFO    plugin-myplugin: default message
+                   ;;
+                   ;; and running the following command
+                   ;;
+                   ;;     lightning-cli my-log my-message debug
+                   ;;
+                   ;; will log something like this
+                   ;;
+                   ;;     2024-03-31T06:31:40.451Z DEBUG   plugin-myplugin: my-message
+                   ;;
+                   (plugin/log (or message \"default message\")
+                               (or level \"info\")
+                               plugin)))}
+          :my-json-rpc-error
+          {:fn (fn [params req plugin]
+                 (let [{:keys [p-req p-opt]}
+                       (plugin/params->map [:p-req :p-opt] params)]
+                   ;; To reply to lightningd with a JSON RPC error, we just
+                   ;; have to throw a `Throwable`.
+                   ;;
+                   ;; The best way to do this is to throw a `clojure.lang.ExceptionInfo`
+                   ;; with an :error key (containing :code and :message keys)
+                   ;; in the map passed to `clojure.core/ex-info` like we do below.
+                   ;; In that case, running the following (with no arguments)
+                   ;;
+                   ;;     lightningd-cli my-json-rpc-error
+                   ;;
+                   ;; will return an JSON RPC error with the \"error\" field being
+                   ;;
+                   ;;     {
+                   ;;       \"code\": \"-100\",
+                   ;;       \"message\": \"'p-req' param is required\",
+                   ;;       \"request\": {
+                   ;;          \"jsonrpc\": \"2.0\",
+                   ;;          \"method\": \"my-json-rpc-error\",
+                   ;;          \"id\": \"cli:my-json-rpc-error#1014832/cln:my-json-rpc-error#42366\",
+                   ;;          \"params\": []
+                   ;;       }
+                   ;;     }
+                   ;;
+                   ;; Notes:
+                   ;;
+                   ;; 1) Any additional information in :error map will retained
+                   ;;    in the JSON RPC error response.
+                   ;; 2) If :error doesn't contain :code or :message keys,
+                   ;;    they will be created for us, :code defaulting to -32603.
+                   ;; 3) When we reply with a JSON RPC error to lightningd,
+                   ;;    we log that information.
+                   ;;
+                   ;; And if we call my-json-rpc-error method with two arguments
+                   ;; by running the following command
+                   ;;
+                   ;;     lightningd-cli my-json-rpc-error foo bar
+                   ;;
+                   ;; we get:
+                   ;;
+                   ;;     {
+                   ;;       \"p-req\": \"foo\",
+                   ;;       \"p-opt\": \"bar\"
+                   ;;     }
+                   (if (nil? p-req)
+                     (throw
+                      (ex-info \"\" {:error {:code \"-100\"
+                                           :message \"'p-req' param is required\"
+                                           :request req}}))
+                     {:p-req p-req :p-opt p-opt})))}}}))
+
+(defn -main [& args]
+  (plugin/run plugin))
+")
+
+(def myplugin
+  "#!/usr/bin/env bash
+
+cd ${0%/*}
+clojure -M --main myplugin
+# clojure -J-Dclojure.server.repl=\"{:port 5555 :accept clojure.core.server/repl}\" -M --main myplugin
+")
+
+(spit "deps.edn" deps.edn)
+(spit "build.clj" build.clj)
+(when-not (fs/directory? "src")
+  (fs/create-dir "src"))
+(spit "src/myplugin.clj" src-myplugin.clj)
+(spit "myplugin" myplugin)
+(shell/sh "chmod" "+x" "myplugin")

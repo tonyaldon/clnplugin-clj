@@ -5,3 +5,10 @@ pytest/plugins/.cpcache
 pytest/__pycache__
 pytest/plugins/java/.cpcache
 pytest/plugins/java/target
+
+tools/.cpcache
+tools/src
+tools/target
+tools/build.clj
+tools/deps.edn
+tools/myplugin

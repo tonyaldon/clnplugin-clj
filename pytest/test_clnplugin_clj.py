@@ -429,3 +429,62 @@ def test_java(node_factory):
     plugin = os.path.join(os.getcwd(), "plugins/java/target/myplugin")
     l1 = node_factory.get_node(options={"plugin": plugin})
     assert l1.rpc.call("foo") == {"bar": "baz"}
+
+
+def test_tools_np(node_factory):
+    # Generate myplugin from tools/np script with local clnplugin-clj
+    os.popen("cd ../tools && rm -r src build.clj deps.edn myplugin target").read()
+    os.popen("cd ../tools && chmod +x np && USE_LOCAL_CLNPLUGIN=1 ./np").read()
+
+    # Run myplugin with command:
+    #
+    #     clojure -M --main myplugin
+    #
+    # This is meant to be used for development
+    plugin = os.path.join(os.getcwd(), "../tools/myplugin")
+    l1 = node_factory.get_node(options={"plugin": plugin,
+                                        "my-opt-multi": ["foo", "bar"]})
+
+    # my-foo
+    assert l1.rpc.call("my-foo") == {"bar": "baz"}
+
+    # my-option
+    assert l1.rpc.call("my-options") == {"my-opt": "my-opt-default",
+                                         "my-opt-multi": ["foo", "bar"],
+                                         "my-opt-dynamic": None}
+    l1.rpc.setconfig(config="my-opt-dynamic", val=12)
+    assert l1.rpc.call("my-options") == {"my-opt": "my-opt-default",
+                                         "my-opt-multi": ["foo", "bar"],
+                                         "my-opt-dynamic": 12}
+
+    # my-info
+    l1_id = l1.rpc.getinfo()["id"]
+    l1_my_info = l1.rpc.call("my-info")
+    assert l1_my_info["id"] == l1_id
+    assert l1_my_info["offline"]["set"] == False
+    assert l1_my_info["config"]["startup"] == True
+    print(l1_my_info)
+
+    # my-log
+    l1.rpc.call("my-log")
+    l1.daemon.wait_for_log(r"INFO.*plugin-myplugin: default message")
+    l1.rpc.call("my-log", {"message": "my-message", "level": "debug"})
+    l1.daemon.wait_for_log(r"DEBUG.*plugin-myplugin: my-message")
+
+    # my-json-rpc-error
+    with pytest.raises(RpcError, match=r"'p-req' param is required"):
+        l1.rpc.call("my-json-rpc-error")
+
+    resp = l1.rpc.call("my-json-rpc-error", {"p-req": "foo", "p-opt": "bar"})
+    assert resp == {"p-req": "foo", "p-opt": "bar"}
+    # l1.rpc.plugin_stop(plugin)
+
+    # Compile plugin into uberjar file.
+    # Meant to be use in production (for distrubuting the plugin).
+    os.popen("cd ../tools && clojure -T:build plugin").read()
+    plugin = os.path.join(os.getcwd(), "../tools/target/myplugin")
+    l1 = node_factory.get_node(options={"plugin": plugin})
+    assert l1.rpc.call("my-foo") == {"bar": "baz"}
+
+    # clean tools directory
+    os.popen("cd ../tools && rm -r src build.clj deps.edn myplugin target").read()
