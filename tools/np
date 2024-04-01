@@ -223,11 +223,51 @@
                       (ex-info \"\" {:error {:code \"-100\"
                                            :message \"'p-req' param is required\"
                                            :request req}}))
-                     {:p-req p-req :p-opt p-opt})))}}}))
+                     {:p-req p-req :p-opt p-opt})))}
+          :my-notify
+          {:fn (fn [params req plugin]
+                 ;; We can send notifications to lightningd for the topics
+                 ;; we declare in plugin's :notifications vector using
+                 ;; `plugin/notify` function like below.
+                 (let [p {:msg \"some message\" :data \"some data\"}]
+                   (plugin/notify \"my-topic\" p plugin)))}}
+         ;; We declare my-topic notification topic to lightningd.  That means
+         ;; that we can send notications to lightningd for that topic.  This is
+         ;; what we do with :my-topic JSON RPC method that we declare
+         ;; in plugin's :rpcmethods map.
+         :notifications [\"my-topic\"]
+         :subscriptions
+         {;; We subscribe to my-topic notification topic.  Doing this
+          ;; we will receive my-topic notifications from all the plugins that
+          ;; declare to lightningd that they intend to send notifications
+          ;; for that topic.  Here we log the JSON RPC notifications my-topic
+          ;; (as Clojure map).  Specifically, as my-notify sends JSON RPC method
+          ;; a my-topic notification when called, when we run the following
+          ;; command
+          ;;
+          ;;     lightning-cli my-notify
+          ;;
+          ;; a line like the following is logged:
+          ;;
+          ;;     2024-04-01T13:36:34.949Z INFO    plugin-myplugin: {:jsonrpc \\\"2.0\\\", :method \\\"my-topic\\\", :params {:origin \\\"myplugin\\\", :payload {:msg \\\"some message\\\", :data \\\"some data\\\"}}}
+          :my-topic {:fn (fn [params req plugin]
+                           (plugin/log (format \"%s\" req) plugin))}
+          ;; We can also subscribe to any lightningd builtin notifications
+          ;; topics.  For instance, here we subscribe to invoice_creation
+          ;; topic and each time we create a an invoice, we receive a
+          ;; JSON RPC invoice_creation notification that we log.  Thus, when
+          ;; we run the following command
+          ;;
+          ;;     lightning-cli invoice 10000 my-label my-description
+          ;;
+          ;; a line like the following is logged:
+          ;;
+          ;;     2024-04-01T14:26:45.609Z INFO    plugin-myplugin: {:jsonrpc \\\"2.0\\\", :method \\\"invoice_creation\\\", :params {:invoice_creation {:amount_msat 10000, :preimage \\\"9771b87e06fb079b5daf0c0913562791ec36b4103f6109bccf9b43179b99a218\\\", :label \\\"my-label\\\"}}}
+          :invoice_creation {:fn (fn [params req plugin]
+                                   (plugin/log (format \"%s\" req) plugin))}}}))
 
 (defn -main [& args]
-  (plugin/run plugin))
-")
+  (plugin/run plugin))")
 
 (def myplugin
   "#!/usr/bin/env bash

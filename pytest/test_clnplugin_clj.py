@@ -477,10 +477,16 @@ def test_tools_np(node_factory):
 
     resp = l1.rpc.call("my-json-rpc-error", {"p-req": "foo", "p-opt": "bar"})
     assert resp == {"p-req": "foo", "p-opt": "bar"}
-    # l1.rpc.plugin_stop(plugin)
+
+    # my-notify and my-topic notification topic
+    l1.rpc.call("my-notify")
+    l1.daemon.wait_for_log(r"INFO.*plugin-myplugin:.*my-topic.*some message.*some data")
+    l1.rpc.invoice(10000, "my-label", "my-description")
+    l1.daemon.wait_for_log(r"INFO.*plugin-myplugin:.*invoice_creation.*preimage.*my-label")
 
     # Compile plugin into uberjar file.
     # Meant to be use in production (for distrubuting the plugin).
+    l1.rpc.plugin_stop(plugin)
     os.popen("cd ../tools && clojure -T:build plugin").read()
     plugin = os.path.join(os.getcwd(), "../tools/target/myplugin")
     l1 = node_factory.get_node(options={"plugin": plugin})
