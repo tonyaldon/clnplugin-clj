@@ -490,6 +490,15 @@ def test_tools_np(node_factory):
     l2_id = l2.info["id"]
     l1.daemon.wait_for_log(f"plugin-myplugin: peer-id: {l2_id}")
 
+    # :init-fn
+    l1.rpc.plugin_stop(plugin)
+    with pytest.raises(RpcError, match=r".*don't set 'my-opt' to 'disable'"):
+        l1.rpc.call("plugin", {"subcommand": "start",
+                               "plugin": plugin,
+                               "my-opt": "disable"})
+    l1.rpc.plugin_start(plugin)
+    l1.daemon.wait_for_log(r"plugin-myplugin:.*:id.*cln:init", 1)
+
     # Compile plugin into uberjar file.
     # Meant to be use in production (for distrubuting the plugin).
     l1.rpc.plugin_stop(plugin)
