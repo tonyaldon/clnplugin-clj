@@ -484,6 +484,12 @@ def test_tools_np(node_factory):
     l1.rpc.invoice(10000, "my-label", "my-description")
     l1.daemon.wait_for_log(r"INFO.*plugin-myplugin:.*invoice_creation.*preimage.*my-label")
 
+    # peer_connected hook
+    l2 = node_factory.get_node()
+    l2.rpc.connect(l1.info["id"], "localhost", l1.port)
+    l2_id = l2.info["id"]
+    l1.daemon.wait_for_log(f"plugin-myplugin: peer-id: {l2_id}")
+
     # Compile plugin into uberjar file.
     # Meant to be use in production (for distrubuting the plugin).
     l1.rpc.plugin_stop(plugin)
