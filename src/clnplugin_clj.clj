@@ -1137,3 +1137,5 @@
               (finally (swap! reqs-in-progress dec))))
           (recur))
         (recur)))))
+
+(load "clnplugin_utils")

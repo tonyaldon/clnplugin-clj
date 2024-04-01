@@ -1406,3 +1406,41 @@
     (is (= (plugin/max-parallel-reqs plugin-2) 32))
     (is (= (plugin/max-parallel-reqs plugin-3) 1023))
     (is (= (plugin/max-parallel-reqs plugin-4) 512))))
+
+(deftest params->map-test
+  ;; params is {}
+  (let [params {}]
+    (is (= (plugin/params->map [] params) params))
+    (is (= (plugin/params->map [:foo] params) params))
+    (is (= (plugin/params->map [:foo :bar] params) params))
+    (is (= (plugin/params->map [:foo :bar :baz] params) params)))
+  ;; params is {:foo "foo-value"}
+  (let [params {:foo "foo-value"}]
+    (is (= (plugin/params->map [] params) {}))
+    (is (= (plugin/params->map [:foo] params) params))
+    (is (= (plugin/params->map [:foo :bar] params) params))
+    (is (= (plugin/params->map [:foo :bar :baz] params) params)))
+  ;; params is {:foo "foo-value" :bar "bar-value"}
+  (let [params {:foo "foo-value" :bar "bar-value"}]
+    (is (= (plugin/params->map [] params) {}))
+    (is (= (plugin/params->map [:foo] params) {:foo "foo-value"}))
+    (is (= (plugin/params->map [:foo :bar] params) params))
+    (is (= (plugin/params->map [:foo :bar :baz] params) params)))
+  ;; params is []
+  (let [params []]
+    (is (= (plugin/params->map [] params) {}))
+    (is (= (plugin/params->map [:foo] params) {}))
+    (is (= (plugin/params->map [:foo :bar] params) {}))
+    (is (= (plugin/params->map [:foo :bar :baz] params) {})))
+  ;; params is ["foo-value"]
+  (let [params ["foo-value"]]
+    (is (= (plugin/params->map [] params) {}))
+    (is (= (plugin/params->map [:foo] params) {:foo "foo-value"}))
+    (is (= (plugin/params->map [:foo :bar] params) {:foo "foo-value"}))
+    (is (= (plugin/params->map [:foo :bar :baz] params) {:foo "foo-value"})))
+  ;; params is ["foo-value" "bar-value"]
+  (let [params ["foo-value" "bar-value"]]
+    (is (= (plugin/params->map [] params) {}))
+    (is (= (plugin/params->map [:foo] params) {:foo "foo-value"}))
+    (is (= (plugin/params->map [:foo :bar] params) {:foo "foo-value" :bar "bar-value"}))
+    (is (= (plugin/params->map [:foo :bar :baz] params) {:foo "foo-value" :bar "bar-value"}))))
