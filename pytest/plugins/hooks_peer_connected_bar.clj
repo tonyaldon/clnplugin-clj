@@ -7,11 +7,7 @@
           {:fn (fn [params req plugin]
                  (plugin/log (format "timestamp: %s" (System/currentTimeMillis))
                              plugin)
-                 {:result "continue"}
-                 ;; (spit "/tmp/foo" "foo bar baz")
-                 ;; {:result "disconnect"
-                 ;;  :error_message "foo bar baz"}
-                 )}}}))
+                 {:result "continue"})}}}))
 
 
 (plugin/run plugin)
