@@ -1,4 +1,4 @@
-<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1" /><link rel="stylesheet" type="text/css" href="/one.css" /><title>clnplugin-clj</title></head><body><div class="header">clnplugin-clj</div><div class="content"><div id="home"><div><p><b>clnplugin-clj</b> is the only <a href="https://github.com/ElementsProject/lightning">Core Lightning</a> plugin library which
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1" /><link rel="stylesheet" type="text/css" href="/one.css" /><title>clnplugin-clj</title></head><body><div class="header">clnplugin-clj</div><div class="content"><div id="home"><div><p><a href="https://github.com/tonyaldon/clnplugin-clj">clnplugin-clj</a> is the only <a href="https://github.com/ElementsProject/lightning">Core Lightning</a> plugin library which
 lets you attach a socket REPL to the plugin&apos;s process, connect to it
 and modify its implementation while it&apos;s running.
 </p>
@@ -7,24 +7,23 @@ and modify its implementation while it&apos;s running.
 </p>
 
 <p>Assuming you have <a href="https://github.com/clojure/clojure">Clojure</a> and <a href="https://github.com/babashka/babashka">babashka</a> (bb) installed on your machine,
-and you also have a CLN node running, you can get a <b>clnplugin-clj</b>
-plugin running just by issuing the following 2 commands (being in an
-empty directory):
+and a CLN node running, you can get a <b>clnplugin-clj</b> plugin running
+just by issuing the following 2 commands (in an empty directory):
 </p>
 
 <pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">curl -s -L https://clnplugin.tonyaldon.com/np | bb 1&gt;/dev/null 2&gt;&amp;1</span>
 $ <span class="one-hl-tms-cmd-line">lightning-cli plugin start $(pwd)/myplugin</span></code></pre>
 
-<p>Some JSON RPC methods have been added to <code class="one-hl one-hl-inline">lightningd</code> and now you can
-for instance call <code class="one-hl one-hl-inline">my-foo</code> method by running:
+<p>As a result, some JSON RPC methods have been added to <code class="one-hl one-hl-inline">lightningd</code> and
+now you can for instance call <code class="one-hl one-hl-inline">my-foo</code> method by running:
 </p>
 
-<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">l1-cli my-foo</span>
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">lightning-cli my-foo</span>
 {
    "bar": "baz"
 }</code></pre>
 
-<p>In fact, <code class="one-hl one-hl-inline">myplugin</code>
+<p>In fact, <code class="one-hl one-hl-inline">myplugin</code> plugin
 </p>
 
 <ul><li><p>defines 3 options <code class="one-hl one-hl-inline">my-opt</code>, <code class="one-hl one-hl-inline">my-opt-multi</code> and <code class="one-hl one-hl-inline">my-opt-dynamic</code>,
@@ -38,13 +37,13 @@ for instance call <code class="one-hl one-hl-inline">my-foo</code> method by run
 </p>
 </li>
 <li><p>subscribes to the custom notification topic <code class="one-hl one-hl-inline">my-topic</code> and to the
-builtin topic notification topic <code class="one-hl one-hl-inline">invoice_creation</code>,
+builtin notification topic <code class="one-hl one-hl-inline">invoice_creation</code>,
 </p>
 </li>
 <li><p>asks to be consulted for the <code class="one-hl one-hl-inline">peer_connected</code> hook and
 </p>
 </li>
-<li><p>initializes the plugin with :init-fn function.
+<li><p>initializes the plugin with a <code class="one-hl one-hl-inline">:init-fn</code> function.
 </p>
 </li>
 </ul>
@@ -52,7 +51,6 @@ builtin topic notification topic <code class="one-hl one-hl-inline">invoice_crea
 <p>All of this can be looked up in the file <code class="one-hl one-hl-inline">src/myplugin.clj</code> (created by
 <code class="one-hl one-hl-inline">np</code> script) that we reproduce below (skipping the 281 lines of comments):
 </p>
-
 
 <pre><code class="one-hl one-hl-block">(<span class="one-hl-keyword">ns</span> <span class="one-hl-type">myplugin</span>
   (<span class="one-hl-clojure-keyword">:require</span> [clnplugin-clj <span class="one-hl-clojure-keyword">:as</span> plugin])
@@ -124,7 +122,181 @@ builtin topic notification topic <code class="one-hl one-hl-inline">invoice_crea
 (<span class="one-hl-keyword">defn</span> <span class="one-hl-function-name">-main</span> [&amp; args]
   (<span class="one-hl-type">plugin</span>/run plugin))</code></pre>
 
-<p>You can find the source code on github: <a href="https://github.com/tonyaldon/clnplugin-clj">tonyaldon/clnplugin-clj</a>.
+<p>Maybe we want to modify our plugin.  We can for instance visit
+<code class="one-hl one-hl-inline">src/myplugin.clj</code> file and change <code class="one-hl one-hl-inline">:fn</code> function of <code class="one-hl one-hl-inline">:my-foo</code> map in
+<code class="one-hl one-hl-inline">:rpcmethods</code> map to the following function that always returns the
+string <code class="one-hl one-hl-inline">&quot;Nothing fancy so far&quot;</code>:
+</p>
+
+<pre><code class="one-hl one-hl-block">(<span class="one-hl-keyword">fn</span> [params req plugin] <span class="one-hl-string">"Nothing fancy so far"</span>)</code></pre>
+
+<p>Now, let&apos;s stop and restart <code class="one-hl one-hl-inline">myplugin</code>
+</p>
+
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">lightning-cli plugin stop $(pwd)/myplugin</span>
+$ <span class="one-hl-tms-cmd-line">lightning-cli plugin start $(pwd)/myplugin</span></code></pre>
+
+<p>and call <code class="one-hl one-hl-inline">my-foo</code> method:
+</p>
+
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">lightning-cli my-foo</span>
+"Nothing fancy so far"</code></pre>
+
+<p>If you&apos;ve read this far, maybe it&apos;s because you want to see a bit of
+magic!
+</p>
+
+<p>So let&apos;s go.  Let&apos;s see how we can modify <code class="one-hl one-hl-inline">myplugin</code> while it&apos;s running.
+</p>
+
+<p>To do this, we modify <code class="one-hl one-hl-inline">myplugin</code> bash script and instead of using the
+command line
+</p>
+
+<pre><code class="one-hl one-hl-block">clojure -M --main myplugin</code></pre>
+
+<p>to run our plugin, we uses the following which attach a socket REPL
+server to our plugin&apos;s process:
+</p>
+
+<pre><code class="one-hl one-hl-block">clojure -J-Dclojure.server.repl=<span class="one-hl-string">"{:port 5555 :accept clojure.core.server/repl}"</span> -M --main myplugin</code></pre>
+
+<p>Specifically, <code class="one-hl one-hl-inline">myplugin</code> bash script is now this:
+</p>
+
+<pre><code class="one-hl one-hl-block"><span class="one-hl-comment-delimiter">#</span><span class="one-hl-comment">!/usr/bin/</span><span class="one-hl-keyword">env</span><span class="one-hl-comment"> bash
+</span>
+<span class="one-hl-builtin">cd</span> ${<span class="one-hl-variable-name">0</span>%/*}
+<span class="one-hl-comment-delimiter"># </span><span class="one-hl-comment">clojure -M --main myplugin
+</span>clojure -J-Dclojure.server.repl=<span class="one-hl-string">"{:port 5555 :accept clojure.core.server/repl}"</span> -M --main myplugin</code></pre>
+
+<p>It&apos;s time to restart <code class="one-hl one-hl-inline">myplugin</code> plugin:
+</p>
+
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">lightning-cli plugin stop $(pwd)/myplugin</span>
+$ <span class="one-hl-tms-cmd-line">lightning-cli plugin start $(pwd)/myplugin</span></code></pre>
+
+<p>We can check that nothing change so far and we still have this:
+</p>
+
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">lightning-cli my-foo</span>
+"Nothing fancy so far"</code></pre>
+
+<p>Now we enter in the magic part!
+</p>
+
+<p>Let&apos;s connect to localhost at port 5555 with <code class="one-hl one-hl-inline">nc</code> (we can do this with
+any client or better with your editor integration):
+</p>
+
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">nc localhost 5555</span>
+user=&gt;</code></pre>
+
+<p>Notice that we have <code class="one-hl one-hl-inline">user=&gt;</code> prompt which expect us to provide Clojure
+code.  <code class="one-hl one-hl-inline">user</code> is because we are in <code class="one-hl one-hl-inline">user</code> namespace.  Our plugin is
+defined in <code class="one-hl one-hl-inline">myplugin</code> namespace, so let&apos;s switch to that namespace:
+</p>
+
+<pre><code class="one-hl one-hl-block">myplugin=&gt; (ns myplugin)
+nil</code></pre>
+
+<p>Now, let&apos;s get the current value of the option <code class="one-hl one-hl-inline">my-opt</code> that we defined:
+</p>
+
+<pre><code class="one-hl one-hl-block">myplugin=&gt; (plugin/get-option plugin :my-opt)
+"my-opt-default"</code></pre>
+
+<p>Why don&apos;t we look at the state of <code class="one-hl one-hl-inline">plugin</code> atom?
+</p>
+
+<pre><code class="one-hl one-hl-block">myplugin=&gt; (clojure.pprint/pprint @plugin)
+{:init
+ {:options {:my-opt "my-opt-default"},
+  :configuration
+  {:lightning-dir "/tmp/l1-regtest/regtest",
+   :rpc-file "lightning-rpc",
+   :startup false,
+   :network "regtest",
+   :feature_set
+   {:init "080000000000000000000000000008a0882a0a69a2",
+    :node "080000000000000000000000000088a0882a0a69a2",
+    :channel "",
+    :invoice "02000022024100"}}},
+ :hooks
+ {:peer_connected
+  {:before ["my-plugin-foo"],
+   :after ["my-plugin-bar" "my-plugin-baz"],
+   :fn
+   #object[myplugin$fn__11031 0x5d9c7cf0 "myplugin$fn__11031@5d9c7cf0"]}},
+ :getmanifest {:allow-deprecated-apis false},
+ :subscriptions
+ {:my-topic
+  {:fn
+   #object[myplugin$fn__11027 0x1ca9f04b "myplugin$fn__11027@1ca9f04b"]},
+  :invoice_creation
+  {:fn
+   #object[myplugin$fn__11029 0x58094be8 "myplugin$fn__11029@58094be8"]}},
+ :notifications ["my-topic"],
+ :dynamic true,
+ :init-fn
+ #object[myplugin$fn__11033 0x1fe0a1ee "myplugin$fn__11033@1fe0a1ee"],
+ :_resps #&lt;Agent@21a5351e: nil&gt;,
+ :rpcmethods
+ {:my-foo
+  {:fn
+   #object[myplugin$fn__11011 0x725da2c9 "myplugin$fn__11011@725da2c9"]},
+  :my-options
+  {:fn
+   #object[myplugin$fn__11013 0x6019f161 "myplugin$fn__11013@6019f161"]},
+  :my-info
+  {:fn
+   #object[myplugin$fn__11015 0x7a6cc35d "myplugin$fn__11015@7a6cc35d"]},
+  :my-log
+  {:fn
+   #object[myplugin$fn__11017 0x72e914cb "myplugin$fn__11017@72e914cb"]},
+  :my-json-rpc-error
+  {:fn
+   #object[myplugin$fn__11022 0x6d3dbbb5 "myplugin$fn__11022@6d3dbbb5"]},
+  :my-notify
+  {:fn
+   #object[myplugin$fn__11025 0x4200cd8a "myplugin$fn__11025@4200cd8a"]},
+  :setconfig
+  {:fn
+   #object[clnplugin_clj$setconfig_BANG_ 0x5eea98bc "clnplugin_clj$setconfig_BANG_@5eea98bc"]}},
+ :options
+ {:my-opt
+  {:type "string",
+   :description "some description",
+   :default "my-opt-default",
+   :value "my-opt-default"},
+  :my-opt-multi {:type "string", :multi true},
+  :my-opt-dynamic {:type "int", :dynamic true}},
+ :socket-file "/tmp/l1-regtest/regtest/lightning-rpc",
+ :_out
+ #object[java.io.OutputStreamWriter 0x649f80e6 "java.io.OutputStreamWriter@649f80e6"]}
+nil</code></pre>
+
+<p>Interesting but how about modifying the plugin?
+</p>
+
+<p>OK, let&apos;s do that.
+</p>
+
+<p>Let&apos;s redefine <code class="one-hl one-hl-inline">my-foo</code> method such that it returns the string <code class="one-hl one-hl-inline">&quot;THIS IS
+MAGIC!&quot;</code>:
+</p>
+
+<pre><code class="one-hl one-hl-block">myplugin=&gt; (plugin/dev-set-rpcmethod plugin :my-foo (fn [params req plugin] "THIS IS MAGIC!")))
+{...}</code></pre>
+
+<p>Now, let&apos;s close the connection, call <code class="one-hl one-hl-inline">my-foo</code> command and observe that
+we&apos;ve modified the plugin while it was running:
+</p>
+
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">l1-cli my-foo</span>
+"THIS IS MAGIC!"</code></pre>
+
+<p>That&apos;s it!
 </p>
 </div>
 </div></div></body></html>
