@@ -350,7 +350,9 @@
             (when-let [notifications (gm-notifications (:notifications p))]
               {:notifications notifications})
             (when-let [featurebits (:featurebits p)]
-              {:featurebits featurebits}))}))
+              {:featurebits featurebits})
+            (when-let [custommessages (:custommessages p)]
+              {:custommessages custommessages}))}))
 
 (defn set-defaults!
   "Set default values for :dynamic, :options and :rpcmethods keys if omitted.

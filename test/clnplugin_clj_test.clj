@@ -367,6 +367,7 @@
                        :node "0800000000000000000000000000000000000000000000000000" ;; 1 << 203
                        :invoice "2000000000000000000000000000000000000000000000000000" ;; 1 << 205
                        }
+                      :custommessages [11008, 11010]
                       :dynamic false})
                req {:id 16}]
            (plugin/gm-resp req plugin))
@@ -402,6 +403,7 @@
                     :node "0800000000000000000000000000000000000000000000000000" ;; 1 << 203
                     :invoice "2000000000000000000000000000000000000000000000000000" ;; 1 << 205
                     }
+                   :custommessages [11008, 11010]
                    :dynamic false}}))
   ;; error because :fn is not a function for foo rpcmethod
   (is (thrown-with-msg?
