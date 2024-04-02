@@ -4,13 +4,15 @@
 :CUSTOM_ID: /
 :END:
 
-*clnplugin-clj* is a [[https://github.com/ElementsProject/lightning][Core Lightning]] (CLN) plugin library for Clojure
-Devs.
+*clnplugin-clj* is the only [[https://github.com/ElementsProject/lightning][Core Lightning]] plugin library which
+lets you attach a socket REPL to the plugin's process, connect to it
+and modify its implementation while it's running.
+
+All this is possible thanks to Clojure and the JVM.
 
 Assuming you have [[https://github.com/clojure/clojure][Clojure]] and [[https://github.com/babashka/babashka][babashka]] (bb) installed on your machine,
-and you also have a CLN node running, you can get a *clnplugin-clj*
-plugin running just by issuing the following 2 commands (being in an
-empty directory):
+and a CLN node running, you can get a *clnplugin-clj* plugin running
+just by issuing the following 2 commands (in an empty directory):
 
 #+BEGIN_SRC tms
 $ curl -s -L https://clnplugin.tonyaldon.com/np | bb 1>/dev/null 2>&1
@@ -27,20 +29,19 @@ $ l1-cli my-foo
 }
 #+END_SRC
 
-In fact, ~myplugin~
+In fact, ~myplugin~ plugin
 
 - defines 3 options ~my-opt~, ~my-opt-multi~ and ~my-opt-dynamic~,
 - registers 6 JSON RPC methods ~my-foo~, ~my-options~, ~my-info~, ~my-log~
   ~my-json-rpc-error~ and ~my-notify~,
 - declares 1 custom notification topic ~my-topic~,
 - subscribes to the custom notification topic ~my-topic~ and to the
-  builtin topic notification topic ~invoice_creation~,
+  builtin notification topic ~invoice_creation~,
 - asks to be consulted for the ~peer_connected~ hook and
-- initializes the plugin with :init-fn function.
+- initializes the plugin with a :init-fn function.
 
 All of this can be looked up in the file ~src/myplugin.clj~ (created by
 ~np~ script) that we reproduce below (skipping the 281 lines of comments):
-
 
 #+BEGIN_SRC clojure
 (ns myplugin
