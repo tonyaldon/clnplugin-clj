@@ -1,59 +1,14 @@
 (in-ns 'clnplugin-clj)
 
-(defn dev-set-rpcmethod
-  "Set :fn key of METHOD in PLUGIN's :rpcmethods with FN.
+(defn get-option
+  "Return value of KW-OPT in PLUGIN if any.
 
-  This is an helper function for developing the plugin interactively
-  when you are connected to the plugin's process (started by lightningd)
-  using a socket REPL.  DON'T USE IT IN PLUGIN's CODE.
-
-  For instance, if you declared :foo method in PLUGIN's :rpcmethods
-  map and your are in the namespace where plugin is defined, you
-  can set its :fn function to always return {:bar \"baz\"} like this:
-
-      (dev-set-rpcmethod plugin :foo
-        (fn [params req plugin] {:bar \"baz\"}))"
-  [plugin method fn]
-  (swap! plugin assoc-in [:rpcmethods method :fn] fn))
-
-(defn dev-set-subscription
-  "Set :fn key of TOPIC in PLUGIN's :subscriptions with FN.
-
-  This is an helper function for developing the plugin interactively
-  when you are connected to the plugin's process (started by lightningd)
-  using a socket REPL.  DON'T USE IT IN PLUGIN's CODE.
-
-  For instance, if you declared :invoice_creation notification topic
-  in PLUGIN's :subscriptions map and your are in the namespace where
-  plugin is defined, you can set its :fn function to log the
-  invoice_creation notification you receive each time an invoice is
-  created like this
-
-      (dev-set-subscription plugin :peer_connected
-        (fn [params req plugin]
-          (plugin/log (format \"%s\" req) plugin)))"
-  [plugin topic fn]
-  (swap! plugin assoc-in [:subscriptions topic :fn] fn))
-
-(defn dev-set-hook
-  "Set :fn key of HOOK in PLUGIN's :hooks with FN.
-
-  This is an helper function for developing the plugin interactively
-  when you are connected to the plugin's process (started by lightningd)
-  using a socket REPL.  DON'T USE IT IN PLUGIN's CODE.
-
-  For instance, if you declared :peer_connected hook in PLUGIN's :hooks
-  map and your are in the namespace where plugin is defined, you can
-  set its :fn function to log the peer id of the node we are going to
-  connect to like this:
-
-      (dev-set-hook plugin :peer_connected
-        (fn [params req plugin]
-          (plugin/log (format \"peer-id: %s\" (get-in params [:peer :id]))
-                      plugin)
-          {:result \"continue\"}))"
-  [plugin hook fn]
-  (swap! plugin assoc-in [:hooks hook :fn] fn))
+  If value has not been set, return the default value if any.
+  If no value, no default or if KW-OPT is not defined in PLUGIN's
+  options, return nil."
+  [plugin kw-opt]
+  (or (get-in @plugin [:options kw-opt :value])
+      (get-in @plugin [:options kw-opt :default])))
 
 (defn params->map
   "Return PARAMS as a map binding PARAMS's elements to keys in KEYS.
@@ -134,3 +89,58 @@
   (or (and (map? params)
            (select-keys params keys))
       (zipmap keys params)))
+
+(defn dev-set-rpcmethod
+  "Set :fn key of METHOD in PLUGIN's :rpcmethods with FN.
+
+  This is an helper function for developing the plugin interactively
+  when you are connected to the plugin's process (started by lightningd)
+  using a socket REPL.  DON'T USE IT IN PLUGIN's CODE.
+
+  For instance, if you declared :foo method in PLUGIN's :rpcmethods
+  map and your are in the namespace where plugin is defined, you
+  can set its :fn function to always return {:bar \"baz\"} like this:
+
+      (dev-set-rpcmethod plugin :foo
+        (fn [params req plugin] {:bar \"baz\"}))"
+  [plugin method fn]
+  (swap! plugin assoc-in [:rpcmethods method :fn] fn))
+
+(defn dev-set-subscription
+  "Set :fn key of TOPIC in PLUGIN's :subscriptions with FN.
+
+  This is an helper function for developing the plugin interactively
+  when you are connected to the plugin's process (started by lightningd)
+  using a socket REPL.  DON'T USE IT IN PLUGIN's CODE.
+
+  For instance, if you declared :invoice_creation notification topic
+  in PLUGIN's :subscriptions map and your are in the namespace where
+  plugin is defined, you can set its :fn function to log the
+  invoice_creation notification you receive each time an invoice is
+  created like this
+
+      (dev-set-subscription plugin :peer_connected
+        (fn [params req plugin]
+          (plugin/log (format \"%s\" req) plugin)))"
+  [plugin topic fn]
+  (swap! plugin assoc-in [:subscriptions topic :fn] fn))
+
+(defn dev-set-hook
+  "Set :fn key of HOOK in PLUGIN's :hooks with FN.
+
+  This is an helper function for developing the plugin interactively
+  when you are connected to the plugin's process (started by lightningd)
+  using a socket REPL.  DON'T USE IT IN PLUGIN's CODE.
+
+  For instance, if you declared :peer_connected hook in PLUGIN's :hooks
+  map and your are in the namespace where plugin is defined, you can
+  set its :fn function to log the peer id of the node we are going to
+  connect to like this:
+
+      (dev-set-hook plugin :peer_connected
+        (fn [params req plugin]
+          (plugin/log (format \"peer-id: %s\" (get-in params [:peer :id]))
+                      plugin)
+          {:result \"continue\"}))"
+  [plugin hook fn]
+  (swap! plugin assoc-in [:hooks hook :fn] fn))

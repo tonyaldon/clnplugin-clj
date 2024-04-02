@@ -383,16 +383,6 @@
     (print-method e sw)
     (str sw)))
 
-(defn get-option
-  "Return value of KW-OPT in PLUGIN if any.
-
-  If value has not been set, return the default value if any.
-  If no value, no default or if KW-OPT is not defined in PLUGIN's
-  options, return nil."
-  [plugin kw-opt]
-  (or (get-in @plugin [:options kw-opt :value])
-      (get-in @plugin [:options kw-opt :default])))
-
 (defn convert-opt-value
   "Return VALUE converted into TYPE."
   [value type]
