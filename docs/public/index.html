@@ -293,10 +293,48 @@ MAGIC!&quot;</code>:
 we&apos;ve modified the plugin while it was running:
 </p>
 
-<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">l1-cli my-foo</span>
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">lightning-cli my-foo</span>
 "THIS IS MAGIC!"</code></pre>
 
 <p>That&apos;s it!
 </p>
+
+<p>Almost!
+</p>
+
+<p>What about distributing a plugin we wrote with <code class="one-hl one-hl-inline">clnplugin-clj</code>?
+</p>
+
+<p>We can compile it into an <code class="one-hl one-hl-inline">uberjar</code> file.  In fact this is the purpose
+of the file <code class="one-hl one-hl-inline">build.clj</code> that <code class="one-hl one-hl-inline">np</code> script created:
+</p>
+
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">tree</span>
+.
+&#9500;&#9472;&#9472; build.clj
+&#9500;&#9472;&#9472; deps.edn
+&#9500;&#9472;&#9472; myplugin
+&#9500;&#9472;&#9472; np
+&#9492;&#9472;&#9472; src
+    &#9492;&#9472;&#9472; myplugin.clj</code></pre>
+
+<p>So to compile our plugin, we can run the following command
+</p>
+
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">clj -T:build plugin</span></code></pre>
+
+<p>which produces the <code class="one-hl one-hl-inline">uberjar</code> file <code class="one-hl one-hl-inline">target/myplugin.jar</code> that we start with
+<code class="one-hl one-hl-inline">java</code> command in <code class="one-hl one-hl-inline">target/myplugin</code> script.
+</p>
+
+<p>Specifically, after stopping <code class="one-hl one-hl-inline">myplugin</code> like this
+</p>
+
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">lightning-cli plugin stop $(pwd)/myplugin</span></code></pre>
+
+<p>we can restart it but this time using the <code class="one-hl one-hl-inline">uberjar</code> file like this:
+</p>
+
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">l1-cli plugin start $(pwd)/target/myplugin</span></code></pre>
 </div>
 </div></div></body></html>

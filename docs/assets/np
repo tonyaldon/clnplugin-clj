@@ -1,0 +1,410 @@
+#!/usr/bin/env bb
+
+(def deps.edn
+  (format "{:deps
+  {%s
+   io.github.tonyaldon/clnrpc-clj {:git/tag \"v24.02\" :git/sha \"e5e57fa\"}}
+  :aliases
+  {:build {:deps {io.github.clojure/tools.build {:mvn/version \"0.9.6\"}
+                 babashka/fs {:mvn/version \"0.5.20\"}}
+          :ns-default build}}}"
+          (if (System/getenv "USE_LOCAL_CLNPLUGIN")
+            "clnplugin-clj/clnplugin-clj {:local/root \"..\"}"
+            "io.github.tonyaldon/clnplugin-clj {:git/tag \"v24.02\" :git/sha \"1719539\"}")))
+
+(def build.clj
+  "(ns build
+  (:require [clojure.tools.build.api :as b])
+  (:require [babashka.fs :as fs]))
+
+(def class-dir \"target/classes\")
+(def p \"target/myplugin\")
+(def uber-file \"target/myplugin.jar\")
+(def p-jar (str (fs/file (fs/cwd) uber-file)))
+
+(defn clean [_]
+  (b/delete {:path \"target\"}))
+
+(defn plugin [_]
+  (let [basis (b/create-basis {:project \"deps.edn\"})]
+    (clean nil)
+    (b/copy-dir {:src-dirs [\"src\"]
+                 :target-dir class-dir})
+    (b/compile-clj {:class-dir class-dir
+                    :basis basis
+                    :ns-compile '[myplugin]})
+    (b/uber {:class-dir class-dir
+             :basis basis
+             :uber-file uber-file
+             :main 'myplugin})
+    (spit p (str \"#!/usr/bin/env -S java -jar \" p-jar))
+    (b/process {:command-args [\"chmod\" \"+x\" p]})))
+")
+
+(def src-myplugin.clj
+  "(ns myplugin
+  (:require [clnplugin-clj :as plugin])
+  (:require [clnrpc-clj :as rpc])
+  (:gen-class))
+
+(def plugin
+  (atom {:options {:my-opt {:type \"string\"
+                            :description \"some description\"
+                            :default \"my-opt-default\"}
+                   :my-opt-multi {:type \"string\"
+                                  :multi true}
+                   :my-opt-dynamic {:type \"int\"
+                                    :dynamic true}}
+         :rpcmethods
+         {:my-foo {:fn (fn [params req plugin] {:bar \"baz\"})}
+          :my-options
+          {:fn (fn [params req plugin]
+                 ;; We can get the current value of an option using `plugin/get-option`
+                 ;; function:
+                 ;;
+                 ;; 1) if the option doesn't exist, return nil,
+                 ;; 2) if the option exists but has not been set by the user,
+                 ;;    return :default if defined or nil,
+                 ;; 3) if the option has been set by the user (at startup or
+                 ;;    dynamicaly with setconfig lightningd command) return
+                 ;;    user's value,
+                 ;; 4) if the option is :multi, the current value if it exists
+                 ;;    is always a vector.
+                 ;;
+                 ;; Note that options cannot be multi and dynamic at the same time.
+                 ;;
+                 ;; Assuming we started our plugin located at /path/to/myplugin like
+                 ;; this
+                 ;;
+                 ;;     lightning-cli -k plugin \\
+                 ;;       subcommand=start \\
+                 ;;       plugin=/path/to/myplugin \\
+                 ;;       my-opt-multi=foo \\
+                 ;;       my-opt-multi=bar
+                 ;;
+                 ;; running the following command
+                 ;;
+                 ;;     lightning-cli my-options
+                 ;;
+                 ;; gives us:
+                 ;;
+                 ;;     {
+                 ;;       \"my-opt\": \"my-opt-default\",
+                 ;;       \"my-opt-multi\": [\"foo\", \"bar\"],
+                 ;;       \"my-opt-dynamic\": null
+                 ;;     }
+                 ;;
+                 ;; Now after setting my-opt-dynamic to 12 by running the following command
+                 ;;
+                 ;;     lightning-cli setconfig my-opt-dynamic 12
+                 ;;
+                 ;; we can see by running the following command again
+                 ;;
+                 ;;     lightning-cli my-options
+                 ;;
+                 ;; which gives us
+                 ;;
+                 ;;     {
+                 ;;       \"my-opt\": \"my-opt-default\",
+                 ;;       \"my-opt-multi\": [\"foo\", \"bar\"],
+                 ;;       \"my-opt-dynamic\": 12
+                 ;;     }
+                 ;;
+                 ;; that my-opt-dynamic option has been set to 12.
+                 {:my-opt (plugin/get-option plugin :my-opt)
+                  :my-opt-multi (plugin/get-option plugin :my-opt-multi)
+                  :my-opt-dynamic (plugin/get-option plugin :my-opt-dynamic)})}
+          :my-info
+          {:fn (fn [params req plugin]
+                 {;; We can get node's id by issuing a getinfo JSON RPC request
+                  ;; to our node using clnrpc-clj library:
+                  :id (:id (rpc/getinfo @plugin))
+                  ;; We can use listconfigs RPC method to check if we are
+                  ;; offline like this:
+                  :offline (-> (rpc/call @plugin \"listconfigs\")
+                               :configs :offline)
+                  ;; During plugin's startup, clnplugin-clj stored the params
+                  ;; of the init request in plugin's :init key.  So we can access
+                  ;; node's configuration like this:
+                  :config (get-in @plugin [:init :configuration])})}
+          :my-log
+          {:fn (fn [params req plugin]
+                 (let [;; When lightningd forwards a JSON RPC request received
+                       ;; from a client, \"params\" field can be a vector or an
+                       ;; object.  Running
+                       ;;
+                       ;;     lightning-cli my-log some-message debug
+                       ;;
+                       ;; will result in \"params\" field of the JSON RPC request to be
+                       ;;
+                       ;;     [\"some-message\" \"debug\"]
+                       ;;
+                       ;; and running
+                       ;;
+                       ;;     lightning-cli -k my-log message=some-message level=debug
+                       ;;
+                       ;; will result in \"params\" field of the JSON RPC request to be
+                       ;;
+                       ;;     {\"message\": \"some-message\", \"level\": \"debug\"}
+                       ;;
+                       ;; We can use the util function `plugin/params->map` to destructure
+                       ;; :fn's argument params as we do below.
+                       {:keys [message level]}
+                       (plugin/params->map [:message :level] params)]
+                   ;; We can use `plugin/log` to log messages to lightningd's log file.
+                   ;; So, running the following command
+                   ;;
+                   ;;     lightning-cli my-log
+                   ;;
+                   ;; will log something like this
+                   ;;
+                   ;;     2024-03-31T06:31:11.631Z INFO    plugin-myplugin: default message
+                   ;;
+                   ;; and running the following command
+                   ;;
+                   ;;     lightning-cli my-log my-message debug
+                   ;;
+                   ;; will log something like this
+                   ;;
+                   ;;     2024-03-31T06:31:40.451Z DEBUG   plugin-myplugin: my-message
+                   ;;
+                   (plugin/log (or message \"default message\")
+                               (or level \"info\")
+                               plugin)))}
+          :my-json-rpc-error
+          {:fn (fn [params req plugin]
+                 (let [{:keys [p-req p-opt]}
+                       (plugin/params->map [:p-req :p-opt] params)]
+                   ;; To reply to lightningd with a JSON RPC error, we just
+                   ;; have to throw a `Throwable`.
+                   ;;
+                   ;; The best way to do this is to throw a `clojure.lang.ExceptionInfo`
+                   ;; with an :error key (containing :code and :message keys)
+                   ;; in the map passed to `clojure.core/ex-info` like we do below.
+                   ;; In that case, running the following (with no arguments)
+                   ;;
+                   ;;     lightningd-cli my-json-rpc-error
+                   ;;
+                   ;; will return an JSON RPC error with the \"error\" field being
+                   ;;
+                   ;;     {
+                   ;;       \"code\": \"-100\",
+                   ;;       \"message\": \"'p-req' param is required\",
+                   ;;       \"request\": {
+                   ;;          \"jsonrpc\": \"2.0\",
+                   ;;          \"method\": \"my-json-rpc-error\",
+                   ;;          \"id\": \"cli:my-json-rpc-error#1014832/cln:my-json-rpc-error#42366\",
+                   ;;          \"params\": []
+                   ;;       }
+                   ;;     }
+                   ;;
+                   ;; Notes:
+                   ;;
+                   ;; 1) Any additional information in :error map will retained
+                   ;;    in the JSON RPC error response.
+                   ;; 2) If :error doesn't contain :code or :message keys,
+                   ;;    they will be created for us, :code defaulting to -32603.
+                   ;; 3) When we reply with a JSON RPC error to lightningd,
+                   ;;    we log that information.
+                   ;;
+                   ;; And if we call my-json-rpc-error method with two arguments
+                   ;; by running the following command
+                   ;;
+                   ;;     lightningd-cli my-json-rpc-error foo bar
+                   ;;
+                   ;; we get:
+                   ;;
+                   ;;     {
+                   ;;       \"p-req\": \"foo\",
+                   ;;       \"p-opt\": \"bar\"
+                   ;;     }
+                   (if (nil? p-req)
+                     (throw
+                      (ex-info \"\" {:error {:code \"-100\"
+                                           :message \"'p-req' param is required\"
+                                           :request req}}))
+                     {:p-req p-req :p-opt p-opt})))}
+          :my-notify
+          {:fn (fn [params req plugin]
+                 ;; We can send notifications to lightningd for the topics
+                 ;; we declare in plugin's :notifications vector using
+                 ;; `plugin/notify` function like below.
+                 (let [p {:msg \"some message\" :data \"some data\"}]
+                   (plugin/notify \"my-topic\" p plugin)))}}
+         ;; We declare my-topic notification topic to lightningd.  That means
+         ;; that we can send notications to lightningd for that topic.  This is
+         ;; what we do with :my-topic JSON RPC method that we declare
+         ;; in plugin's :rpcmethods map.
+         :notifications [\"my-topic\"]
+         :subscriptions
+         {;; We subscribe to my-topic notification topic.  Doing this
+          ;; we will receive my-topic notifications from all the plugins that
+          ;; declare to lightningd that they intend to send notifications
+          ;; for that topic.  Here we log the JSON RPC notifications my-topic
+          ;; (as Clojure map).  Specifically, as my-notify sends JSON RPC method
+          ;; a my-topic notification when called, when we run the following
+          ;; command
+          ;;
+          ;;     lightning-cli my-notify
+          ;;
+          ;; a line like the following is logged:
+          ;;
+          ;;     2024-04-01T13:36:34.949Z INFO    plugin-myplugin: {:jsonrpc \\\"2.0\\\", :method \\\"my-topic\\\", :params {:origin \\\"myplugin\\\", :payload {:msg \\\"some message\\\", :data \\\"some data\\\"}}}
+          :my-topic {:fn (fn [params req plugin]
+                           (plugin/log (format \"%s\" req) plugin))}
+          ;; We can also subscribe to any lightningd builtin notifications
+          ;; topics.  For instance, here we subscribe to invoice_creation
+          ;; topic and each time we create a an invoice, we receive a
+          ;; JSON RPC invoice_creation notification that we log.  Thus, when
+          ;; we run the following command
+          ;;
+          ;;     lightning-cli invoice 10000 my-label my-description
+          ;;
+          ;; a line like the following is logged:
+          ;;
+          ;;     2024-04-01T14:26:45.609Z INFO    plugin-myplugin: {:jsonrpc \\\"2.0\\\", :method \\\"invoice_creation\\\", :params {:invoice_creation {:amount_msat 10000, :preimage \\\"9771b87e06fb079b5daf0c0913562791ec36b4103f6109bccf9b43179b99a218\\\", :label \\\"my-label\\\"}}}
+          :invoice_creation {:fn (fn [params req plugin]
+                                   (plugin/log (format \"%s\" req) plugin))}}
+         :hooks
+         {;; With :peer_connected map, we tell lightningd that we want to
+          ;; be consulted when we try to connect to a peer or when a peer
+          ;; tries to connect to us.  When this happens and the plugin
+          ;; \"my-plugin-foo\" is not running or returns {\"result\": \"continue\"},
+          ;; we receive a peer_connected JSON RPC request (before my-plugin-bar
+          ;; and my-plugin-baz if any of them wish to be consulted on
+          ;; peer connection).  To that request, we log the peer id we try
+          ;; to connect to and return {\"result\": \"continue\"} JSON RPC response.
+          ;; Then, either the peer_connected JSON RPC request is handed to
+          ;; another plugin which takes care of the connection or lightningd
+          ;; handles internally the request.
+          ;;
+          ;; For instance, if the node 0340bb...d4f673 tries to connect with
+          ;; us, a line like this one is logged:
+          ;;
+          ;;      2024-04-01T15:00:27.208Z INFO    plugin-myplugin: peer-id: 0340bb...d4f673
+          :peer_connected
+          {:before [\"my-plugin-foo\"]
+           :after  [\"my-plugin-bar\" \"my-plugin-baz\"]
+           :fn (fn [params req plugin]
+                 (plugin/log (format \"peer-id: %s\" (get-in params [:peer :id]))
+                             plugin)
+                 {:result \"continue\"})}}
+         ;; init request
+         ;;
+         ;; After replying to the getmanifest, if everything is OK, lightningd
+         ;; sends us an init request which starts the init round.  When we (the
+         ;; plugin) receive the request, the following happens in order:
+         ;; 1) We store init request in plugin.  So after the init round
+         ;;    with lightningd, assuming plugin holds the state of our plugin,
+         ;;    we'll be able to access lightningd configuration like this:
+         ;;
+         ;;        (get-in @plugin [:init :configuration])
+         ;;
+         ;; 2) We add `setconfig!` as :fn of :setconfig method in :rpcmethods
+         ;;    map of PLUGIN.  This is for dynamic options handling.
+         ;;
+         ;; 3) We set :socket-file PLUGIN's key to lightningd socket file.
+         ;;    This way using `clnrpc-clj` library we can send RPC requests
+         ;;    to lightningd like this:
+         ;;
+         ;;        (rpc/getinfo @plugin)
+         ;;
+         ;;    or
+         ;;
+         ;;        (rpc/call @plugin \"invoice\"
+         ;;                  {:amount_msat 10000
+         ;;                   :label \"some-label\"
+         ;;                   :description \"some-description\"})
+         ;;
+         ;; 4) We try to set plugin's :options with the values given by the
+         ;;    user in the init request.  If not possible we disable the plugin
+         ;;    by replying to lightningd with a JSON RPC response whose \"result\"
+         ;;    field contains a \"disable\" field with a message reporting which
+         ;;    option made the intialization of the plugin to fail.
+         ;;
+         ;; 5) At that point if plugin's :options have been set correctly,
+         ;;    we try to call plugin's :init-fn function if specified:
+         ;;
+         ;;    - If no exception is thrown, we return a JSON RPC response
+         ;;      (as Clojure map) with :result field set to {},
+         ;;    - If not, we return a JSON RPC response (as Clojure map) with
+         ;;      :result field containing a :disable field set to a message
+         ;;      reporting the exception.
+         ;;
+         ;; So with the following :init-fn if we try to start myplugin plugin
+         ;; with :my-opt set to \"disable\" by running the following command
+         ;;
+         ;;
+         ;;     lightning-cli -k plugin \\
+         ;;       subcommand=start \\
+         ;;       plugin=/path/to/myplugin \\
+         ;;       my-opt=disable
+         ;;
+         ;; the plugin won't start and we'll see the following output in
+         ;; the terminal:
+         ;;
+         ;;     {
+         ;;       \"code\": -3,
+         ;;       \"message\": \"/path/to/myplugin: disabled itself at init: To start the plugin, don't set 'my-opt' to 'disable'.\"
+         ;;     }
+         ;;
+         ;; And if we start the plugin (without setting :my-opt to \"disable\")
+         ;; like this
+         ;;
+         ;;     lightning-cli plugin start /path/to/myplugin
+         ;;
+         ;; the plugin starts correctly and a line like this one is logged:
+         ;;
+         ;;     2024-04-01T16:13:03.935Z INFO    plugin-myplugin: {:jsonrpc \\\"2.0\\\", :id \\\"cln:init#39\\\", :method \\\"init\\\", :params {:options {:my-opt \\\"my-opt-default\\\"}, :configuration {:lightning-dir \\\"/tmp/l1-regtest/regtest\\\", :rpc-file \\\"lightning-rpc\\\", :startup false, :network \\\"...\\\", :feature_set {:init \\\"...\\\", :node \\\"...\\\", :channel \\\"\\\", :invoice \\\"...\\\"}}}}
+         :init-fn
+         (fn [params req plugin]
+           (if (= (plugin/get-option plugin :my-opt) \"disable\")
+             (throw (ex-info \"To start the plugin, don't set 'my-opt' to 'disable'.\" {}))
+             (plugin/log (format \"%s\" req) plugin)))
+
+         ;; Other keys that we can add to the plugin atom:
+         ;;
+         ;;     - :dynamic
+         ;;     - :featurebits
+         ;;     - :custommessages
+         ;;
+         ;; 1) :dynamic is set to true by default.  We can set to false
+         ;;    if we don't want the plugin to be dynamic.
+         ;; 2) :featurebits expects a map with whose values (the featurebits)
+         ;;    are string representing hexadecimal number like this for
+         ;;    for instance:
+         ;;
+         ;;        {
+         ;;          :init \"0200000000000000000000000000000000000000000000000000\" ;; 1 << 201
+         ;;          :node \"0800000000000000000000000000000000000000000000000000\" ;; 1 << 203
+         ;;          :invoice \"2000000000000000000000000000000000000000000000000000\" ;; 1 << 205
+         ;;          ;; :channel \"...\"
+         ;;        }
+         ;;
+         ;; 3) :custommessages expects a vector of integers like this
+         ;;    for instance:
+         ;;
+         ;;        [11008, 11010]
+         ;;
+
+         }))
+
+(defn -main [& args]
+  (plugin/run plugin))
+")
+
+(def myplugin
+  "#!/usr/bin/env bash
+
+cd ${0%/*}
+clojure -M --main myplugin
+# clojure -J-Dclojure.server.repl=\"{:port 5555 :accept clojure.core.server/repl}\" -M --main myplugin
+")
+
+(spit "deps.edn" deps.edn)
+(spit "build.clj" build.clj)
+(when-not (fs/directory? "src")
+  (fs/create-dir "src"))
+(spit "src/myplugin.clj" src-myplugin.clj)
+(spit "myplugin" myplugin)
+(shell/sh "chmod" "+x" "myplugin")
