@@ -9,27 +9,27 @@
 
 (deftest gm-option-test
   ;; defaults when option map argument is `nil`
-  (is (= (plugin/gm-option [:foo nil])
+  (is (= (#'plugin/gm-option [:foo nil])
          {:name "foo"
           :type "string"
           :description ""}))
   ;; types
-  (is (= (plugin/gm-option [:foo {:type "string"
+  (is (= (#'plugin/gm-option [:foo {:type "string"
                                   :description "foo-description"}])
          {:name "foo"
           :type "string"
           :description "foo-description"}))
-  (is (= (plugin/gm-option [:foo {:type "int"
+  (is (= (#'plugin/gm-option [:foo {:type "int"
                                   :description "foo-description"}])
          {:name "foo"
           :type "int"
           :description "foo-description"}))
-  (is (= (plugin/gm-option [:foo {:type "bool"
+  (is (= (#'plugin/gm-option [:foo {:type "bool"
                                   :description "foo-description"}])
          {:name "foo"
           :type "bool"
           :description "foo-description"}))
-  (is (= (plugin/gm-option [:foo {:type "flag"
+  (is (= (#'plugin/gm-option [:foo {:type "flag"
                                   :description "foo-description"}])
          {:name "foo"
           :type "flag"
@@ -37,22 +37,22 @@
   (is (thrown-with-msg?
        Throwable
        #"Wrong type 'not-a-type' for option.*:foo.*.  Authorized types are: string, int, bool, flag."
-       (plugin/gm-option [:foo {:type "not-a-type"}])))
+       (#'plugin/gm-option [:foo {:type "not-a-type"}])))
   ;; description
-  (is (= (plugin/gm-option [:foo {:type "string"
+  (is (= (#'plugin/gm-option [:foo {:type "string"
                                   :description "foo-description"}])
          {:name "foo"
           :type "string"
           :description "foo-description"}))
   ;; default
-  (is (= (plugin/gm-option [:foo {:type "string"
+  (is (= (#'plugin/gm-option [:foo {:type "string"
                                   :description "foo-description"
                                   :default "foo bar baz"}])
          {:name "foo"
           :type "string"
           :description "foo-description"
           :default "foo bar baz"}))
-  (is (= (plugin/gm-option [:foo {:type "int"
+  (is (= (#'plugin/gm-option [:foo {:type "int"
                                   :description "foo-description"
                                   :default 1}])
          {:name "foo"
@@ -62,29 +62,29 @@
   (is (thrown-with-msg?
        Throwable
        #"Default value of ':foo' option has the wrong type.  'string' type is expected and default value is '1':"
-       (plugin/gm-option [:foo {:type "string"
+       (#'plugin/gm-option [:foo {:type "string"
                                 :description "foo-description"
                                 :default 1}])))
   (is (thrown-with-msg?
        Throwable
        #"Default value of ':foo' option has the wrong type.  'string' type is expected and default value is '1':"
-       (plugin/gm-option [:foo {:description "foo-description"
+       (#'plugin/gm-option [:foo {:description "foo-description"
                                 :default 1}])))
   (is (thrown-with-msg?
        Throwable
        #"Default value of ':foo' option has the wrong type.  'int' type is expected and default value is 'true':"
-       (plugin/gm-option [:foo {:type "int"
+       (#'plugin/gm-option [:foo {:type "int"
                                 :description "foo-description"
                                 :default true}])))
   ;; multi
-  (is (= (plugin/gm-option [:foo {:type "string"
+  (is (= (#'plugin/gm-option [:foo {:type "string"
                                   :description "foo-description"
                                   :multi true}])
          {:name "foo"
           :type "string"
           :description "foo-description"
           :multi true}))
-  (is (= (plugin/gm-option [:foo {:type "int"
+  (is (= (#'plugin/gm-option [:foo {:type "int"
                                   :description "foo-description"
                                   :multi true}])
          {:name "foo"
@@ -94,11 +94,11 @@
   (is (thrown-with-msg?
        Throwable
        #"':foo' option cannot be 'multi'.  Only options of type 'string' and 'int' can:"
-       (plugin/gm-option [:foo {:type "bool"
+       (#'plugin/gm-option [:foo {:type "bool"
                                 :description "foo-description"
                                 :multi true}])))
   ;; dynamic
-  (is (= (plugin/gm-option [:foo {:type "string"
+  (is (= (#'plugin/gm-option [:foo {:type "string"
                                   :description "foo-description"
                                   :dynamic true}])
          {:name "foo"
@@ -106,7 +106,7 @@
           :description "foo-description"
           :dynamic true}))
   ;; deprecated
-  (is (= (plugin/gm-option [:foo {:type "string"
+  (is (= (#'plugin/gm-option [:foo {:type "string"
                                   :description "foo-description"
                                   :deprecated true}])
          {:name "foo"
@@ -117,23 +117,23 @@
   (is (thrown-with-msg?
        Throwable
        #"':foo' option cannot be multi and dynamic at the same time:"
-       (plugin/gm-option [:foo {:type "string"
+       (#'plugin/gm-option [:foo {:type "string"
                                 :description "foo-description"
                                 :multi true
                                 :dynamic true}]))))
 
 (deftest gm-options-test
-  (is (= (plugin/gm-options {}) []))
-  (is (= (plugin/gm-options {:foo {:type "string"
+  (is (= (#'plugin/gm-options {}) []))
+  (is (= (#'plugin/gm-options {:foo {:type "string"
                                    :description "foo-description"}})
          [{:name "foo"
            :type "string"
            :description "foo-description"}]))
-  (is (= (plugin/gm-options {:foo-1 nil})
+  (is (= (#'plugin/gm-options {:foo-1 nil})
          [{:name "foo-1"
            :type "string"
            :description ""}]))
-  (is (= (plugin/gm-options {:foo-1 nil
+  (is (= (#'plugin/gm-options {:foo-1 nil
                              :foo-2 {:type "string"
                                      :description "foo-2-description"}
                              :foo-3 {:type "int"
@@ -158,13 +158,13 @@
            :multi true}])))
 
 (deftest gm-rpcmethods-test
-  (is (= (plugin/gm-rpcmethods {}) []))
-  (is (= (plugin/gm-rpcmethods
+  (is (= (#'plugin/gm-rpcmethods {}) []))
+  (is (= (#'plugin/gm-rpcmethods
           {:foo {:usage "usage"
                  :description "description"
                  :fn (fn [params req plugin])}})
          [{:name "foo" :usage "usage" :description "description"}]))
-  (is (= (plugin/gm-rpcmethods
+  (is (= (#'plugin/gm-rpcmethods
           {:foo-1 {:fn (fn [params req plugin])}
            :foo-2 {:usage "usage-2"
                    :fn (fn [params req plugin])}
@@ -190,31 +190,31 @@
   (is (thrown-with-msg?
        Throwable
        #"You cannot define ':getinfo' method which is already a lightningd internal method."
-       (plugin/gm-rpcmethods {:getinfo {}})))
+       (#'plugin/gm-rpcmethods {:getinfo {}})))
   ;; cannot declare methods which are already lightningd hooks
   (is (thrown-with-msg?
        Throwable
        #"You cannot define ':peer_connected' method which is already a lightningd hook."
-       (plugin/gm-rpcmethods {:peer_connected {}})))
+       (#'plugin/gm-rpcmethods {:peer_connected {}})))
   ;; :fn is not defined
   (is (thrown-with-msg?
        Throwable
        #":fn is not defined for ':foo' RPC method"
-       (plugin/gm-rpcmethods {:foo {}})))
+       (#'plugin/gm-rpcmethods {:foo {}})))
   ;; error because :fn is not a function
   (is (thrown-with-msg?
        Throwable
        #"Error in ':foo' RPC method definition.  :fn must be a function not '\[:a-vector \"is not a function\"\]' which is an instance of 'class clojure.lang.PersistentVector'"
-       (plugin/gm-rpcmethods {:foo {:fn [:a-vector "is not a function"]}})))
+       (#'plugin/gm-rpcmethods {:foo {:fn [:a-vector "is not a function"]}})))
   ;; error because :fn is not a function (we don't allow symbol as value of :fn)
   (is (thrown-with-msg?
        Throwable
        #"Error in ':foo' RPC method definition.  :fn must be a function not 'some-symbol' which is an instance of 'class clojure.lang.Symbol'"
-       (plugin/gm-rpcmethods {:foo {:fn 'some-symbol}}))))
+       (#'plugin/gm-rpcmethods {:foo {:fn 'some-symbol}}))))
 
 (deftest gm-notifications-test
-  (is (= (plugin/gm-notifications nil) nil))
-  (is (= (plugin/gm-notifications ["foo-1" "foo-2" "foo-3"])
+  (is (= (#'plugin/gm-notifications nil) nil))
+  (is (= (#'plugin/gm-notifications ["foo-1" "foo-2" "foo-3"])
          [{:method "foo-1"} {:method "foo-2"} {:method "foo-3"}]))
   ;; Don't let the user declare "log", "progress" or "message" notification
   ;; topics to lightningd.  If they do so, they may are going to use there
@@ -236,24 +236,24 @@
   (is (thrown-with-msg?
        Throwable
        #"Remove 'log' from :notifications vector."
-       (plugin/gm-notifications ["log"])))
+       (#'plugin/gm-notifications ["log"])))
   (is (thrown-with-msg?
        Throwable
        #"Remove 'message' from :notifications vector."
-       (plugin/gm-notifications ["message"])))
+       (#'plugin/gm-notifications ["message"])))
   (is (thrown-with-msg?
        Throwable
        #"Remove 'progress' from :notifications vector."
-       (plugin/gm-notifications ["progress"]))))
+       (#'plugin/gm-notifications ["progress"]))))
 
 (deftest gm-subscriptions-test
-  (is (= (plugin/gm-subscriptions nil) nil))
-  (is (= (plugin/gm-subscriptions
+  (is (= (#'plugin/gm-subscriptions nil) nil))
+  (is (= (#'plugin/gm-subscriptions
           {:foo-0 {:fn (fn [params req plugin])}
            :foo-1 {:fn (fn [params req plugin])}
            :foo-2 {:fn (fn [params req plugin])}})
          ["foo-0" "foo-1" "foo-2"]))
-  (is (= (plugin/gm-subscriptions
+  (is (= (#'plugin/gm-subscriptions
           {:foo-0 {:fn (fn [params req plugin])}
            :foo-1 {:fn (fn [params req plugin])}
            :* {:fn (fn [params req plugin])}})
@@ -262,21 +262,21 @@
   (is (thrown-with-msg?
        Throwable
        #":fn is not defined for ':foo' notification topic in :subscriptions map."
-       (plugin/gm-subscriptions {:foo {}})))
+       (#'plugin/gm-subscriptions {:foo {}})))
   ;; error because :fn is not a function
   (is (thrown-with-msg?
        Throwable
        #"Error in ':foo' notification topic in :subscriptions map.  :fn must be a function not '\[:a-vector \"is not a function\"\]' which is an instance of 'class clojure.lang.PersistentVector'"
-       (plugin/gm-subscriptions {:foo {:fn [:a-vector "is not a function"]}})))
+       (#'plugin/gm-subscriptions {:foo {:fn [:a-vector "is not a function"]}})))
   ;; error because :fn is not a function (we don't allow symbol as value of :fn)
   (is (thrown-with-msg?
        Throwable
        #"Error in ':foo' notification topic in :subscriptions map.  :fn must be a function not 'some-symbol' which is an instance of 'class clojure.lang.Symbol'"
-       (plugin/gm-subscriptions {:foo {:fn 'some-symbol}}))))
+       (#'plugin/gm-subscriptions {:foo {:fn 'some-symbol}}))))
 
 (deftest gm-hooks-test
-  (is (= (plugin/gm-hooks nil) nil))
-  (is (= (plugin/gm-hooks
+  (is (= (#'plugin/gm-hooks nil) nil))
+  (is (= (#'plugin/gm-hooks
           {:foo-0 {:fn (fn [params req plugin])}
            :foo-1 {:before ["bar-1" "baz-1"]
                    :fn (fn [params req plugin])}
@@ -294,17 +294,17 @@
   (is (thrown-with-msg?
        Throwable
        #":fn is not defined for ':foo' hook :hooks map."
-       (plugin/gm-hooks {:foo {}})))
+       (#'plugin/gm-hooks {:foo {}})))
   ;; error because :fn is not a function
   (is (thrown-with-msg?
        Throwable
        #"Error in ':foo' hook in :hooks map.  :fn must be a function not '\[:a-vector \"is not a function\"\]' which is an instance of 'class clojure.lang.PersistentVector'"
-       (plugin/gm-hooks {:foo {:fn [:a-vector "is not a function"]}})))
+       (#'plugin/gm-hooks {:foo {:fn [:a-vector "is not a function"]}})))
   ;; error because :fn is not a function (we don't allow symbol as value of :fn)
   (is (thrown-with-msg?
        Throwable
        #"Error in ':foo' hook in :hooks map.  :fn must be a function not 'some-symbol' which is an instance of 'class clojure.lang.Symbol'"
-       (plugin/gm-hooks {:foo {:fn 'some-symbol}}))))
+       (#'plugin/gm-hooks {:foo {:fn 'some-symbol}}))))
 
 (deftest gm-resp-test
   ;; defaults
@@ -312,7 +312,7 @@
                              :rpcmethods {}
                              :dynamic true})
                req {:id 16}]
-           (plugin/gm-resp req plugin))
+           (#'plugin/gm-resp req plugin))
          {:jsonrpc "2.0"
           :id 16
           :result {:options []
@@ -324,7 +324,7 @@
                              :dynamic false
                              :key-not-retained "not retained"})
                req {:id 16}]
-           (plugin/gm-resp req plugin))
+           (#'plugin/gm-resp req plugin))
          {:jsonrpc "2.0"
           :id 16
           :result {:options []
@@ -370,7 +370,7 @@
                       :custommessages [11008, 11010]
                       :dynamic false})
                req {:id 16}]
-           (plugin/gm-resp req plugin))
+           (#'plugin/gm-resp req plugin))
          {:jsonrpc "2.0"
           :id 16
           :result {:options [{:name "foo-1"
@@ -413,7 +413,7 @@
                            :rpcmethods {:foo {:fn [:a-vector "is not a function"]}}
                            :dynamic true})
              req {:id 16}]
-         (plugin/gm-resp req plugin))))
+         (#'plugin/gm-resp req plugin))))
   ;; error because :fn is not a function for foo subscription
   (is (thrown-with-msg?
        Throwable
@@ -423,7 +423,7 @@
                            :dynamic true
                            :subscriptions {:foo {:fn [:a-vector "is not a function"]}}})
              req {:id 16}]
-         (plugin/gm-resp req plugin))))
+         (#'plugin/gm-resp req plugin))))
   ;; error because :fn is not a function for foo hook
   (is (thrown-with-msg?
        Throwable
@@ -431,9 +431,9 @@
        (let [plugin (atom {:options {}
                            :rpcmethods {}
                            :dynamic true
-                           :hooks (plugin/gm-hooks {:foo {:fn [:a-vector "is not a function"]}})})
+                           :hooks (#'plugin/gm-hooks {:foo {:fn [:a-vector "is not a function"]}})})
              req {:id 16}]
-         (plugin/gm-resp req plugin))))
+         (#'plugin/gm-resp req plugin))))
   ;; "log", "message", "progress" notifications not to be declared
   (is (thrown-with-msg?
        Throwable
@@ -443,36 +443,36 @@
                            :dynamic true
                            :notifications ["progress"]})
              req {:id 16}]
-         (plugin/gm-resp req plugin)))))
+         (#'plugin/gm-resp req plugin)))))
 
 (deftest set-defaults!-test
   (is (= (let [plugin (atom nil)]
-           (plugin/set-defaults! plugin)
+           (#'plugin/set-defaults! plugin)
            @plugin)
          {:options {}
           :rpcmethods {}
           :dynamic true}))
   (is (= (let [plugin (atom {:options {:opt1 'opt1}})]
-           (plugin/set-defaults! plugin)
+           (#'plugin/set-defaults! plugin)
            @plugin)
          {:options {:opt1 'opt1}
           :rpcmethods {}
           :dynamic true}))
   (is (= (let [plugin (atom {:rpcmethods {:foo 'foo}})]
-           (plugin/set-defaults! plugin)
+           (#'plugin/set-defaults! plugin)
            @plugin)
          {:options {}
           :rpcmethods {:foo 'foo}
           :dynamic true}))
   (is (= (let [plugin (atom {:options {:opt1 'opt1}
                              :rpcmethods {:foo 'foo}})]
-           (plugin/set-defaults! plugin)
+           (#'plugin/set-defaults! plugin)
            @plugin)
          {:options {:opt1 'opt1}
           :rpcmethods {:foo 'foo}
           :dynamic true}))
   (is (= (let [plugin (atom {:dynamic false})]
-           (plugin/set-defaults! plugin)
+           (#'plugin/set-defaults! plugin)
            @plugin)
          {:options {}
           :rpcmethods {}
@@ -480,7 +480,7 @@
   (is (= (let [plugin (atom {:options {:opt1 'opt1}
                              :rpcmethods {:foo 'foo}
                              :dynamic false})]
-           (plugin/set-defaults! plugin)
+           (#'plugin/set-defaults! plugin)
            @plugin)
          {:options {:opt1 'opt1}
           :rpcmethods {:foo 'foo}
@@ -490,7 +490,7 @@
   (is (= (let [plugin (atom nil)
                req {:method "getmanifest"
                     :params {:allow-deprecated-apis false}}]
-           (plugin/add-request! req plugin)
+           (#'plugin/add-request! req plugin)
            @plugin)
          {:getmanifest {:allow-deprecated-apis false}}))
   (is (= (let [plugin (atom nil)
@@ -499,7 +499,7 @@
                     {:options {:bar "BAR"}
                      :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                      :rpc-file "lightning-rpc"}}}]
-           (plugin/add-request! req plugin)
+           (#'plugin/add-request! req plugin)
            @plugin)
          {:init {:options {:bar "BAR"}
                  :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
@@ -521,61 +521,61 @@
     (is (= (plugin/get-option plugin :foo-5) 2))))
 
 (deftest convert-opt-value-test
-  (is (= (plugin/convert-opt-value 12 nil) 12))
-  (is (= (plugin/convert-opt-value 12 "int") 12))
-  (is (= (plugin/convert-opt-value -12 nil) -12))
-  (is (= (plugin/convert-opt-value -12 "int") -12))
-  (is (= (plugin/convert-opt-value true nil) true))
-  (is (= (plugin/convert-opt-value true "bool") true))
-  (is (= (plugin/convert-opt-value false nil) false))
-  (is (= (plugin/convert-opt-value false "bool") false))
-  (is (= (plugin/convert-opt-value "foo" nil) "foo"))
-  (is (= (plugin/convert-opt-value "foo" "string") "foo"))
-  (is (= (plugin/convert-opt-value "12" "string") "12"))
-  (is (= (plugin/convert-opt-value "12" "int") 12))
-  (is (= (plugin/convert-opt-value "-12" "int") -12))
-  (is (= (plugin/convert-opt-value "true" "bool") true))
-  (is (= (plugin/convert-opt-value "false" "bool") false))
+  (is (= (#'plugin/convert-opt-value 12 nil) 12))
+  (is (= (#'plugin/convert-opt-value 12 "int") 12))
+  (is (= (#'plugin/convert-opt-value -12 nil) -12))
+  (is (= (#'plugin/convert-opt-value -12 "int") -12))
+  (is (= (#'plugin/convert-opt-value true nil) true))
+  (is (= (#'plugin/convert-opt-value true "bool") true))
+  (is (= (#'plugin/convert-opt-value false nil) false))
+  (is (= (#'plugin/convert-opt-value false "bool") false))
+  (is (= (#'plugin/convert-opt-value "foo" nil) "foo"))
+  (is (= (#'plugin/convert-opt-value "foo" "string") "foo"))
+  (is (= (#'plugin/convert-opt-value "12" "string") "12"))
+  (is (= (#'plugin/convert-opt-value "12" "int") 12))
+  (is (= (#'plugin/convert-opt-value "-12" "int") -12))
+  (is (= (#'plugin/convert-opt-value "true" "bool") true))
+  (is (= (#'plugin/convert-opt-value "false" "bool") false))
   ;; when `setconfig` has just the config argument set,
   ;; this indicate to turn on the flag
   ;; There's no way to turn off a flag dynamically as of CLN 24.02
-  (is (= (plugin/convert-opt-value nil "flag") true))
-  (is (= (plugin/convert-opt-value "true" "flag") true))
-  (is (= (plugin/convert-opt-value "false" "flag") false)))
+  (is (= (#'plugin/convert-opt-value nil "flag") true))
+  (is (= (#'plugin/convert-opt-value "true" "flag") true))
+  (is (= (#'plugin/convert-opt-value "false" "flag") false)))
 
 (deftest set-option!-test
   (try
     (let [plugin (atom {:options {}})]
-      (plugin/set-option! [:foo "foo-value"] plugin :at-init))
+      (#'plugin/set-option! [:foo "foo-value"] plugin :at-init))
     (catch Exception e
       (is (= (ex-data e)
              {:disable "Cannot set ':foo' option which has not been declared to lightningd"}))))
   (try
     (let [plugin (atom {:options {}})]
-      (plugin/set-option! [:foo "foo-value"] plugin))
+      (#'plugin/set-option! [:foo "foo-value"] plugin))
     (catch Exception e
       (is (= (ex-data e)
              {:error {:code -32602
                       :message "Cannot set ':foo' option which has not been declared to lightningd"}}))))
   (is (= (let [plugin (atom {:options {:foo nil}})]
-           (plugin/set-option! [:foo "foo-value"] plugin :at-init)
+           (#'plugin/set-option! [:foo "foo-value"] plugin :at-init)
            @plugin)
          {:options {:foo {:value "foo-value"}}}))
   (is (= (let [plugin (atom {:options {:foo {:dynamic true}}})]
-           (plugin/set-option! [:foo "foo-value"] plugin)
+           (#'plugin/set-option! [:foo "foo-value"] plugin)
            @plugin)
          {:options {:foo {:dynamic true
                           :value "foo-value"}}}))
   (try
     (let [plugin (atom {:options {:foo nil}})]
-      (plugin/set-option! [:foo "foo-value"] plugin))
+      (#'plugin/set-option! [:foo "foo-value"] plugin))
     (catch Exception e
       (is (ex-data e)
           {:error {:code -32602
                    :message "Cannot set ':foo' option which is not dynamic.  Add ':dynamic true' to its declaration."}})))
   (is (= (let [plugin (atom {:options {:foo nil
                                        :bar {:default "bar-default"}}})]
-           (plugin/set-option! [:bar "bar-value"] plugin :at-init)
+           (#'plugin/set-option! [:bar "bar-value"] plugin :at-init)
            @plugin)
          {:options {:foo nil
                     :bar {:default "bar-default"
@@ -583,7 +583,7 @@
   (is (= (let [plugin (atom {:options {:foo nil
                                        :bar {:default "bar-default"
                                              :dynamic true}}})]
-           (plugin/set-option! [:bar "bar-value"] plugin)
+           (#'plugin/set-option! [:bar "bar-value"] plugin)
            @plugin)
          {:options {:foo nil
                     :bar {:default "bar-default"
@@ -596,7 +596,7 @@
                          {:check-opt
                           (fn [value plugin]
                             (throw (ex-info "Wrong option 'foo'" {})))}}})]
-      (plugin/set-option! [:foo "foo-value"] plugin :at-init))
+      (#'plugin/set-option! [:foo "foo-value"] plugin :at-init))
     (catch Exception e
       (is (= (ex-data e) {:disable "Wrong option 'foo'"}))))
   ;; :check-opt throws an error so the option won't be set by lightningd (dynamic option)
@@ -607,7 +607,7 @@
                           :check-opt
                           (fn [value plugin]
                             (throw (ex-info "Wrong option 'foo'" {})))}}})]
-      (plugin/set-option! [:foo "foo-value"] plugin))
+      (#'plugin/set-option! [:foo "foo-value"] plugin))
     (catch Exception e
       (is (= (ex-data e)
              {:error {:code -32602 :message "Wrong option 'foo'"}}))))
@@ -616,7 +616,7 @@
     (let [plugin (atom {:options
                         {:foo
                          {:check-opt [:a-vector "is not a function"]}}})]
-      (plugin/set-option! [:foo "foo-value"] plugin :at-init))
+      (#'plugin/set-option! [:foo "foo-value"] plugin :at-init))
     (catch Exception e
       (is (= (ex-data e)
              {:disable ":check-opt of ':foo' option must be a function not '[:a-vector \"is not a function\"]' which is an instance of 'class clojure.lang.PersistentVector'"}))))
@@ -624,7 +624,7 @@
     (let [plugin (atom {:options
                         {:foo
                          {:check-opt 'some-symbol}}})]
-      (plugin/set-option! [:foo "foo-value"] plugin :at-init))
+      (#'plugin/set-option! [:foo "foo-value"] plugin :at-init))
     (catch Exception e
       (is (= (ex-data e)
              {:disable ":check-opt of ':foo' option must be a function not 'some-symbol' which is an instance of 'class clojure.lang.Symbol'"}))))
@@ -634,7 +634,7 @@
                         {:foo
                          {:dynamic true
                           :check-opt [:a-vector "is not a function"]}}})]
-      (plugin/set-option! [:foo "foo-value"] plugin))
+      (#'plugin/set-option! [:foo "foo-value"] plugin))
     (catch Exception e
       (is (= (ex-data e)
              {:error {:code -32602
@@ -644,7 +644,7 @@
     (let [plugin (atom {:options
                         {:foo
                          {:check-opt (fn [value plugin] (/ 1 0))}}})]
-      (plugin/set-option! [:foo "foo-value"] plugin :at-init))
+      (#'plugin/set-option! [:foo "foo-value"] plugin :at-init))
     (catch Exception e
       (is (re-find
            #"(?s):check-opt of ':foo' option thrown the following exception when called with 'foo-value' value:.*#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
@@ -655,7 +655,7 @@
                         {:foo
                          {:dynamic true
                           :check-opt (fn [value plugin] (/ 1 0))}}})]
-      (plugin/set-option! [:foo "foo-value"] plugin))
+      (#'plugin/set-option! [:foo "foo-value"] plugin))
     (catch Exception e
       (is (re-find
            #"(?s):check-opt of ':foo' option thrown the following exception when called with 'foo-value' value:.*#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
@@ -666,7 +666,7 @@
                        {:check-opt
                         (fn [value plugin]
                           (swap! plugin assoc :bar "baz"))}}})]
-    (plugin/set-option! [:foo "foo-value"] plugin :at-init)
+    (#'plugin/set-option! [:foo "foo-value"] plugin :at-init)
     (is (= (:bar @plugin) "baz"))
     (is (= (get-in @plugin [:options :foo :value]) "foo-value")))
   (let [plugin (atom {:options
@@ -675,7 +675,7 @@
                         :check-opt
                         (fn [value plugin]
                           (swap! plugin assoc :bar "baz"))}}})]
-    (plugin/set-option! [:foo "foo-value"] plugin)
+    (#'plugin/set-option! [:foo "foo-value"] plugin)
     (is (= (:bar @plugin) "baz"))
     (is (= (get-in @plugin [:options :foo :value]) "foo-value"))))
 
@@ -683,7 +683,7 @@
   (is (= (let [plugin (atom {:options {:foo nil
                                        :bar {:default "bar-default"}
                                        :baz {:dynamic true}}})]
-           (plugin/set-options-at-init! {} plugin)
+           (#'plugin/set-options-at-init! {} plugin)
            @plugin)
          {:options {:foo nil
                     :bar {:default "bar-default"}
@@ -691,7 +691,7 @@
   (is (= (let [plugin (atom {:options {:foo nil
                                        :bar {:default "bar-default"}
                                        :baz {:dynamic true}}})]
-           (plugin/set-options-at-init! {:foo "foo-value"} plugin)
+           (#'plugin/set-options-at-init! {:foo "foo-value"} plugin)
            @plugin)
          {:options {:foo {:value "foo-value"}
                     :bar {:default "bar-default"}
@@ -699,9 +699,9 @@
   (is (= (let [plugin (atom {:options {:foo nil
                                        :bar {:default "bar-default"}
                                        :baz {:dynamic true}}})]
-           (plugin/set-options-at-init! {:foo "foo-value"
-                                         :bar "bar-value"
-                                         :baz "baz-value"} plugin)
+           (#'plugin/set-options-at-init! {:foo "foo-value"
+                                           :bar "bar-value"
+                                           :baz "baz-value"} plugin)
            @plugin)
          {:options {:foo {:value "foo-value"}
                     :bar {:default "bar-default"
@@ -714,9 +714,103 @@
                                    (fn [value plugin]
                                      (throw (ex-info "Wrong option 'foo'" {})))}
                                   :bar {:default "bar-default"}}})]
-      (plugin/set-options-at-init! {:foo "foo-value" :bar "bar-value"} plugin))
+      (#'plugin/set-options-at-init! {:foo "foo-value" :bar "bar-value"} plugin))
     (catch clojure.lang.ExceptionInfo e
       (is (= (ex-data e) {:disable "Wrong option 'foo'"})))))
+
+(deftest setconfig!-test
+  ;; Note that lightningd send `setconfig` requests
+  ;; to the plugin with `val` in `params` being a string
+  ;; even if the option is defined by the plugin as being
+  ;; of type "int" or "bool".  If the option is of type
+  ;; "flag", `val` is not present in the request and this
+  ;; means that we turn on the flag option.  There is no
+  ;; way to turn off a flag option dynamically as of CLN 24.02.
+  (let [plugin (atom {:options {:foo {:dynamic true}}})
+        params {:config "foo", :val "foo-value"}
+        resp (#'plugin/setconfig! params nil plugin)]
+    (is (= resp {}))
+    (is (= @plugin {:options {:foo {:value "foo-value"
+                                    :dynamic true}}})))
+  (let [plugin (atom {:options {:foo {:type "int"
+                                      :dynamic true}}})
+        params-0 {:config "foo", :val "12"}
+        params-1 {:config "foo", :val "-12"}]
+    (is (= (#'plugin/setconfig! params-0 nil plugin) {}))
+    (is (= @plugin {:options {:foo {:value 12
+                                    :type "int"
+                                    :dynamic true}}}))
+    (is (= (#'plugin/setconfig! params-1 nil plugin) {}))
+    (is (= @plugin {:options {:foo {:value -12
+                                    :type "int"
+                                    :dynamic true}}})))
+  (let [plugin (atom {:options {:foo {:type "bool"
+                                      :dynamic true}}})
+        params-0 {:config "foo", :val "true"}
+        params-1 {:config "foo", :val "false"}]
+    (is (= (#'plugin/setconfig! params-0 nil plugin) {}))
+    (is (= @plugin {:options {:foo {:value true
+                                    :type "bool"
+                                    :dynamic true}}}))
+    (is (= (#'plugin/setconfig! params-1 nil plugin) {}))
+    (is (= @plugin {:options {:foo {:value false
+                                    :type "bool"
+                                    :dynamic true}}})))
+  (let [plugin (atom {:options {:foo {:type "flag"
+                                      :dynamic true}}})
+        params {:config "foo"}]
+    (is (= (#'plugin/setconfig! params nil plugin) {}))
+    (is (= @plugin {:options {:foo {:value true
+                                    :type "flag"
+                                    :dynamic true}}})))
+  (try
+    (let [plugin (atom {:options {:foo nil}})
+          params {:config "foo", :val "foo-value"}]
+      (#'plugin/setconfig! params nil plugin))
+    (catch Exception e
+      (is (= (ex-data e)
+             {:error {:code -32602
+                      :message "Cannot set ':foo' option which is not dynamic.  Add ':dynamic true' to its declaration."}}))))
+  ;; :check-opt
+  (let [plugin (atom {:options
+                      {:foo
+                       {:dynamic true
+                        :check-opt (fn [value plugin]
+                                     (when-not (and (number? value) (pos? value))
+                                       (throw (ex-info "'foo' option must be positive" {}))))}}})
+        params-ok {:config "foo", :val 12}
+        params-wrong {:config "foo", :val -1}]
+    (is (= (#'plugin/setconfig! params-ok nil plugin) {}))
+    (is (= (get-in @plugin [:options :foo :value]) 12))
+    (try
+      (#'plugin/setconfig! params-wrong nil plugin)
+      (catch Exception e
+        (is (= (ex-data e)
+               {:error {:code -32602 :message "'foo' option must be positive"}})))))
+  (try
+    (let [plugin (atom {:options
+                        {:foo
+                         {:dynamic true
+                          :check-opt [:a-vector "is not a function"]}}})
+          params {:config "foo", :val "foo-value"}]
+      (#'plugin/setconfig! params nil plugin))
+    (catch Exception e
+      (is (= (ex-data e)
+             {:error {:code -32602
+                      :message ":check-opt of ':foo' option must be a function not '[:a-vector \"is not a function\"]' which is an instance of 'class clojure.lang.PersistentVector'"}}))))
+
+  (try
+    (let [plugin (atom {:options
+                        {:foo
+                         {:dynamic true
+                          :check-opt (fn [value plugin] (/ 1 0))}}})
+          params {:config "foo", :val "foo-value"}]
+      (#'plugin/setconfig! params nil plugin))
+    (catch Exception e
+      ;; (prn e)
+      (is (re-find
+           #"(?s):check-opt of ':foo' option thrown the following exception when called with 'foo-value' value:.*#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
+           (get-in (ex-data e) [:error :message]))))))
 
 (deftest process-init!-test
   (let [plugin (atom {:options {} :rpcmethods {} :dynamic true
@@ -725,7 +819,7 @@
              :params {:options {}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (is (= (plugin/process-init! req plugin)
+    (is (= (#'plugin/process-init! req plugin)
            {:jsonrpc "2.0" :id 0 :result {}}))
     (is (= (dissoc @plugin :rpcmethods)
            {:options {}
@@ -751,7 +845,7 @@
                                 :bar "bar-value"}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (is (= (plugin/process-init! req plugin)
+    (is (= (#'plugin/process-init! req plugin)
            {:jsonrpc "2.0" :id 0 :result {}}))
     (is (= (dissoc @plugin :rpcmethods :init-fn)
            {:options {:foo {:value "foo-value"}
@@ -782,7 +876,7 @@
              :params {:options {:foo "foo-value"}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (is (= (plugin/process-init! req plugin)
+    (is (= (#'plugin/process-init! req plugin)
            {:jsonrpc "2.0" :id 0 :result {:disable "Wrong option 'foo'"}})))
   ;; :check-opt is called for each option before we try to run
   ;; :init-fn.  So, a wrong option will disable the plugin before
@@ -801,7 +895,7 @@
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
 
-    (is (= (plugin/process-init! req plugin)
+    (is (= (#'plugin/process-init! req plugin)
            {:jsonrpc "2.0" :id 0 :result {:disable "Wrong option 'foo'"}})))
 
   ;; :check-opt is not a function
@@ -815,7 +909,7 @@
              :params {:options {:foo "foo-value"}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
-    (is (= (plugin/process-init! req plugin)
+    (is (= (#'plugin/process-init! req plugin)
            {:jsonrpc "2.0" :id 0 :result {:disable ":check-opt of ':foo' option must be a function not '[:a-vector \"is not a function\"]' which is an instance of 'class clojure.lang.PersistentVector'"}})))
 
   ;; :check-opt throws an error at execution time
@@ -831,7 +925,7 @@
                                       :rpc-file "lightning-rpc"}}}]
     (is (re-find
          #"(?s):check-opt of ':foo' option thrown the following exception when called with 'foo-value' value:.*#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
-         (get-in (plugin/process-init! req plugin) [:result :disable]))))
+         (get-in (#'plugin/process-init! req plugin) [:result :disable]))))
   ;; disable plugin because of :init-fn plugin key
   ;;
   ;; :init-fn not a function
@@ -846,7 +940,7 @@
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
 
-    (is (= (plugin/process-init! req plugin)
+    (is (= (#'plugin/process-init! req plugin)
            {:jsonrpc "2.0" :id 0 :result {:disable ":init-fn must be a function not 'not-a-function' which is an instance of 'class clojure.lang.Symbol'"}})))
   ;; :init-fn throws an error
   (let [plugin (atom {:options {}
@@ -861,7 +955,7 @@
 
     (is (re-find
          #"(?s)#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
-         (get-in (plugin/process-init! req plugin) [:result :disable]))))
+         (get-in (#'plugin/process-init! req plugin) [:result :disable]))))
   ;; :init-fn disable the plugin
   (let [plugin (atom {:options {}
                       :rpcmethods {}
@@ -874,107 +968,13 @@
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
                                       :rpc-file "lightning-rpc"}}}]
 
-    (is (= (-> (plugin/process-init! req plugin)
+    (is (= (-> (#'plugin/process-init! req plugin)
                :result :disable str/split-lines first)
            "disabled by user"))))
 
-(deftest setconfig!-test
-  ;; Note that lightningd send `setconfig` requests
-  ;; to the plugin with `val` in `params` being a string
-  ;; even if the option is defined by the plugin as being
-  ;; of type "int" or "bool".  If the option is of type
-  ;; "flag", `val` is not present in the request and this
-  ;; means that we turn on the flag option.  There is no
-  ;; way to turn off a flag option dynamically as of CLN 24.02.
-  (let [plugin (atom {:options {:foo {:dynamic true}}})
-        params {:config "foo", :val "foo-value"}
-        resp (plugin/setconfig! params nil plugin)]
-    (is (= resp {}))
-    (is (= @plugin {:options {:foo {:value "foo-value"
-                                    :dynamic true}}})))
-  (let [plugin (atom {:options {:foo {:type "int"
-                                      :dynamic true}}})
-        params-0 {:config "foo", :val "12"}
-        params-1 {:config "foo", :val "-12"}]
-    (is (= (plugin/setconfig! params-0 nil plugin) {}))
-    (is (= @plugin {:options {:foo {:value 12
-                                    :type "int"
-                                    :dynamic true}}}))
-    (is (= (plugin/setconfig! params-1 nil plugin) {}))
-    (is (= @plugin {:options {:foo {:value -12
-                                    :type "int"
-                                    :dynamic true}}})))
-  (let [plugin (atom {:options {:foo {:type "bool"
-                                      :dynamic true}}})
-        params-0 {:config "foo", :val "true"}
-        params-1 {:config "foo", :val "false"}]
-    (is (= (plugin/setconfig! params-0 nil plugin) {}))
-    (is (= @plugin {:options {:foo {:value true
-                                    :type "bool"
-                                    :dynamic true}}}))
-    (is (= (plugin/setconfig! params-1 nil plugin) {}))
-    (is (= @plugin {:options {:foo {:value false
-                                    :type "bool"
-                                    :dynamic true}}})))
-  (let [plugin (atom {:options {:foo {:type "flag"
-                                      :dynamic true}}})
-        params {:config "foo"}]
-    (is (= (plugin/setconfig! params nil plugin) {}))
-    (is (= @plugin {:options {:foo {:value true
-                                    :type "flag"
-                                    :dynamic true}}})))
-  (try
-    (let [plugin (atom {:options {:foo nil}})
-          params {:config "foo", :val "foo-value"}]
-      (plugin/setconfig! params nil plugin))
-    (catch Exception e
-      (is (= (ex-data e)
-             {:error {:code -32602
-                      :message "Cannot set ':foo' option which is not dynamic.  Add ':dynamic true' to its declaration."}}))))
-  ;; :check-opt
-  (let [plugin (atom {:options
-                      {:foo
-                       {:dynamic true
-                        :check-opt (fn [value plugin]
-                                     (when-not (and (number? value) (pos? value))
-                                       (throw (ex-info "'foo' option must be positive" {}))))}}})
-        params-ok {:config "foo", :val 12}
-        params-wrong {:config "foo", :val -1}]
-    (is (= (plugin/setconfig! params-ok nil plugin) {}))
-    (is (= (get-in @plugin [:options :foo :value]) 12))
-    (try
-      (plugin/setconfig! params-wrong nil plugin)
-      (catch Exception e
-        (is (= (ex-data e)
-               {:error {:code -32602 :message "'foo' option must be positive"}})))))
-  (try
-    (let [plugin (atom {:options
-                        {:foo
-                         {:dynamic true
-                          :check-opt [:a-vector "is not a function"]}}})
-          params {:config "foo", :val "foo-value"}]
-      (plugin/setconfig! params nil plugin))
-    (catch Exception e
-      (is (= (ex-data e)
-             {:error {:code -32602
-                      :message ":check-opt of ':foo' option must be a function not '[:a-vector \"is not a function\"]' which is an instance of 'class clojure.lang.PersistentVector'"}}))))
-
-  (try
-    (let [plugin (atom {:options
-                        {:foo
-                         {:dynamic true
-                          :check-opt (fn [value plugin] (/ 1 0))}}})
-          params {:config "foo", :val "foo-value"}]
-      (plugin/setconfig! params nil plugin))
-    (catch Exception e
-      ;; (prn e)
-      (is (re-find
-           #"(?s):check-opt of ':foo' option thrown the following exception when called with 'foo-value' value:.*#error.*:cause.*Divide by zero.*:via.*java.lang.ArithmeticException"
-           (get-in (ex-data e) [:error :message]))))))
-
 (deftest notif-test
   (let [method "foo" params {:bar "baz"}]
-    (is (= (plugin/notif method params)
+    (is (= (#'plugin/notif method params)
            {:jsonrpc "2.0" :method method :params params}))))
 
 (deftest write-test
@@ -984,9 +984,9 @@
         resp-2 {:jsonrpc "2.0" :id "id-2" :result nil}
         resp-3 {:jsonrpc "2.0" :id "id-3" :error {:code -32600 :message "Something wrong happened"}}
         resp-4 {:jsonrpc "2.0" :method "log" :params {:level "debug" :message "Some message"}}]
-    (plugin/write nil [['req-0 resp-0]] out)
-    (plugin/write nil [['req-0 resp-0] ['req-1 resp-1] ['req-2 resp-2] ['req-3 resp-3]] out)
-    (plugin/write nil [[nil resp-4]] out)
+    (#'plugin/write nil [['req-0 resp-0]] out)
+    (#'plugin/write nil [['req-0 resp-0] ['req-1 resp-1] ['req-2 resp-2] ['req-3 resp-3]] out)
+    (#'plugin/write nil [[nil resp-4]] out)
     (let [outs (str/split (str out) #"\n\n")
           resps (map #(json/read-str % :key-fn keyword) outs)]
       (is (= resps (list resp-0
@@ -999,7 +999,7 @@
   (let [out (new java.io.StringWriter)
         req {:jsonrpc "2.0" :id "some-id" :method "foo" :params {:bar "baz"}}
         resp {:jsonrpc "2.0" :id "some-id" :result (atom nil)}]
-    (plugin/write nil [[req resp]] out)
+    (#'plugin/write nil [[req resp]] out)
     (let [outs (str/split (str out) #"\n\n")
           resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
           err (some #(when (= (:id %) "some-id") %) resp-and-logs)]
@@ -1028,7 +1028,7 @@
   (let [out (new java.io.StringWriter)
         req {:jsonrpc "2.0" :id "some-id" :method "foo" :params {:bar "baz"}}
         resp {:jsonrpc "2.0" :id "some-id" :error (atom nil)}]
-    (plugin/write nil [[req resp]] out)
+    (#'plugin/write nil [[req resp]] out)
     (let [outs (str/split (str out) #"\n\n")
           resp-and-logs (map #(json/read-str % :key-fn keyword) outs)
           err (some #(when (= (:id %) "some-id") %) resp-and-logs)]
@@ -1056,7 +1056,7 @@
   ;; notifications
   (let [out (new java.io.StringWriter)
         notif {:jsonrpc "2.0" :method "some-notif" :params (atom nil)}]
-    (plugin/write nil [[nil notif]] out)
+    (#'plugin/write nil [[nil notif]] out)
     (let [outs (str/split (str out) #"\n\n")
           logs (map #(json/read-str % :key-fn keyword) outs)]
       ;; logs
@@ -1240,12 +1240,12 @@
         req-3 {:jsonrpc "2.0" :id "id-3" :method "foo-3" :params {}}
         req-4 {:jsonrpc "2.0" :id "id-4" :method "foo-4" :params {}}
         req-5 {:jsonrpc "2.0" :id "id-5" :method "foo-5" :params {}}]
-    (is (= (second (plugin/process req-0 plugin)) {:jsonrpc "2.0" :id "id-0" :result {:bar "baz"}}))
-    (is (= (second (plugin/process req-1 plugin)) {:jsonrpc "2.0" :id "id-1" :result {:bar-1 "baz-1"}}))
-    (is (= (second (plugin/process req-2 plugin)) {:jsonrpc "2.0" :id "id-2" :result {:bar-2 "baz-2"}}))
-    (is (= (second (plugin/process req-3 plugin)) {:jsonrpc "2.0" :id "id-3" :result {:bar-3 "id-3"}}))
-    (is (= (second (plugin/process req-4 plugin)) {:jsonrpc "2.0" :id "id-4" :result {}}))
-    (is (= (second (plugin/process req-5 plugin)) {:jsonrpc "2.0" :id "id-5" :result {:bar-5 "baz-4"}})))
+    (is (= (second (#'plugin/process req-0 plugin)) {:jsonrpc "2.0" :id "id-0" :result {:bar "baz"}}))
+    (is (= (second (#'plugin/process req-1 plugin)) {:jsonrpc "2.0" :id "id-1" :result {:bar-1 "baz-1"}}))
+    (is (= (second (#'plugin/process req-2 plugin)) {:jsonrpc "2.0" :id "id-2" :result {:bar-2 "baz-2"}}))
+    (is (= (second (#'plugin/process req-3 plugin)) {:jsonrpc "2.0" :id "id-3" :result {:bar-3 "id-3"}}))
+    (is (= (second (#'plugin/process req-4 plugin)) {:jsonrpc "2.0" :id "id-4" :result {}}))
+    (is (= (second (#'plugin/process req-5 plugin)) {:jsonrpc "2.0" :id "id-5" :result {:bar-5 "baz-4"}})))
 
   ;; Custom errors raised by user
   (let [plugin (atom {:rpcmethods
@@ -1256,7 +1256,7 @@
                                  (ex-info msg {:error
                                                {:code -100 :message msg}}))))}}})
         req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
-    (let [[log-msgs resp] (plugin/process req plugin)]
+    (let [[log-msgs resp] (#'plugin/process req plugin)]
       (is (= resp {:jsonrpc "2.0" :id "some-id"
                    :error {:code -100 :message "custom-error"}}))
       (is (re-find #"Error while processing.*method.*custom-error" (first log-msgs)))
@@ -1271,7 +1271,7 @@
                                (let [msg "custom-error"]
                                  (ex-info msg {:error {:message msg}}))))}}})
         req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
-    (let [[log-msgs resp] (plugin/process req plugin)]
+    (let [[log-msgs resp] (#'plugin/process req plugin)]
       (is (= resp {:jsonrpc "2.0" :id "some-id"
                    :error {:code -32603 :message "custom-error"}}))))
 
@@ -1284,7 +1284,7 @@
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
         req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
-    (let [[log-msgs resp] (plugin/process req plugin)]
+    (let [[log-msgs resp] (#'plugin/process req plugin)]
       (is (= (get-in resp [:error :code]) -100))
       (is (re-find #"Error while processing.*method.*custom-error"
                    (get-in resp [:error :message])))))
@@ -1298,7 +1298,7 @@
                       :_out (new java.io.StringWriter)
                       :_resps (agent nil)})
         req {:jsonrpc "2.0" :id "some-id" :method "custom-error" :params {}}]
-    (let [[log-msgs resp] (plugin/process req plugin)]
+    (let [[log-msgs resp] (#'plugin/process req plugin)]
       (is (= (get-in resp [:error :code]) -32603))
       (is (re-find #"Error while processing.*method.*custom-error"
                    (get-in resp [:error :message])))))
@@ -1308,7 +1308,7 @@
                       {:execution-error
                        {:fn (fn [params req plugin] (/ 1 0))}}})
         req {:jsonrpc "2.0" :id "some-id" :method "execution-error" :params {}}]
-    (let [[log-msgs resp] (plugin/process req plugin)]
+    (let [[log-msgs resp] (#'plugin/process req plugin)]
       (is (= (get-in resp [:error :code]) -32603))
       (is (re-find #"Error while processing.*method.*execution-error"
                    (get-in resp [:error :message])))
@@ -1323,7 +1323,7 @@
                       {:assertion-error
                        {:fn (fn [params req plugin] (assert (< 0 -1)))}}})
         req {:jsonrpc "2.0" :id "some-id" :method "assertion-error" :params {}}]
-    (let [[log-msgs resp] (plugin/process req plugin)]
+    (let [[log-msgs resp] (#'plugin/process req plugin)]
       (is (= (get-in resp [:error :code]) -32603))
       (is (re-find #"Error while processing.*method.*assertion-error"
                    (get-in resp [:error :message])))
@@ -1344,9 +1344,9 @@
         req-0 {:jsonrpc "2.0" :method "foo-0" :params {}}
         req-1 {:jsonrpc "2.0" :method "foo-1" :params {:bar-1 "baz-1"}}
         req-2 {:jsonrpc "2.0" :method "foo-2" :params {}}]
-    (is (= (plugin/process req-0 plugin) [nil nil]))
-    (is (= (plugin/process req-1 plugin) [nil nil]))
-    (is (= (plugin/process req-2 plugin) [nil nil]))
+    (is (= (#'plugin/process req-0 plugin) [nil nil]))
+    (is (= (#'plugin/process req-1 plugin) [nil nil]))
+    (is (= (#'plugin/process req-2 plugin) [nil nil]))
     (is (= (:foo-0 @plugin) "bar-0"))
     (is (= (:foo-1 @plugin) {:bar-1 "baz-1"}))
     (is (= (:* @plugin) ["all" "foo-2"])))
@@ -1354,7 +1354,7 @@
   ;; subscription error - receive a notification with no corresponding subscription
   (let [plugin (atom {:subscriptions {}})
         req {:jsonrpc "2.0" :method "foo" :params {}}
-        [log-msgs resp] (plugin/process req plugin)]
+        [log-msgs resp] (#'plugin/process req plugin)]
     (is (= resp nil))
     (is (re-find #"Error while processing.*method.*foo" (first log-msgs)))
     (is (re-find #":cause.*Cannot.*invoke.*clojure.lang.IFn.invoke.*because.*method_fn.*is.*null" (second log-msgs))))
@@ -1363,12 +1363,12 @@
   (let [plugin (atom {:hooks
                       {:some-hook {:fn (fn [params req plugin] {:result "continue"})}}})
         req {:jsonrpc "2.0" :id "some-id" :method "some-hook" :params {}}]
-    (is (= (second (plugin/process req plugin)) {:jsonrpc "2.0" :id "some-id" :result {:result "continue"}})))
+    (is (= (second (#'plugin/process req plugin)) {:jsonrpc "2.0" :id "some-id" :result {:result "continue"}})))
 
   ;; hook error - receive a notification with no corresponding subscription
   (let [plugin (atom {:hooks {}})
         req {:jsonrpc "2.0" :id "some-id" :method "peer_connected" :params {}}
-        [log-msgs resp] (plugin/process req plugin)]
+        [log-msgs resp] (#'plugin/process req plugin)]
     (is (= (get-in resp [:error :code]) -32603))
     (is (re-find #"Error while processing.*method.*peer_connected"
                  (get-in resp [:error :message])))
@@ -1379,14 +1379,14 @@
   (is (= (let [req {:jsonrpc "2.0" :id 0 :method "foo" :params {}}
                req-str (str (json/write-str req :escape-slash false) "\n\n")]
            (with-open [in (-> (java.io.StringReader. req-str) clojure.lang.LineNumberingPushbackReader.)]
-             (plugin/read in)))
+             (#'plugin/read in)))
          {:jsonrpc "2.0" :id 0 :method "foo" :params {}}))
   (is (= (let [req-str (str "{\"jsonrpc\":\"2.0\","
                             "\n"
                             "\"id\":0,\"method\":\"foo\",\"params\":{}}"
                             "\n\n")]
            (with-open [in (-> (java.io.StringReader. req-str) clojure.lang.LineNumberingPushbackReader.)]
-             (plugin/read in)))
+             (#'plugin/read in)))
          {:jsonrpc "2.0" :id 0 :method "foo" :params {}}))
   (is (= (let [req-0 {:jsonrpc "2.0" :id 0 :method "foo-0" :params {}}
                req-1 {:jsonrpc "2.0" :id 0 :method "foo-1" :params {}}
@@ -1394,17 +1394,17 @@
                req-1-str (str (json/write-str req-1 :escape-slash false) "\n\n")
                reqs-str (str req-0-str req-1-str)]
            (with-open [in (-> (java.io.StringReader. reqs-str) clojure.lang.LineNumberingPushbackReader.)]
-             (plugin/read in)))
+             (#'plugin/read in)))
          {:jsonrpc "2.0" :id 0 :method "foo-0" :params {}}))
   (is (=
        (let [req-str "foo\n"]
          (with-open [in (-> (java.io.StringReader. req-str) clojure.lang.LineNumberingPushbackReader.)]
-           (plugin/read in)))
+           (#'plugin/read in)))
        nil))
   (try
     (let [req-str "foo\n\n"]
       (with-open [in (-> (java.io.StringReader. req-str) clojure.lang.LineNumberingPushbackReader.)]
-        (plugin/read in)))
+        (#'plugin/read in)))
     (catch clojure.lang.ExceptionInfo e
       (is (= (ex-data e)
              {:error {:code -32700 :message "Invalid token in json input: 'foo'"}})))))
@@ -1415,11 +1415,11 @@
         plugin-2 (atom {:max-parallel-reqs 32})
         plugin-3 (atom {:max-parallel-reqs 2048})
         plugin-4 (atom {:max-parallel-reqs 'not-an-int})]
-    (is (= (plugin/max-parallel-reqs plugin-0) 512))
-    (is (= (plugin/max-parallel-reqs plugin-1) 1))
-    (is (= (plugin/max-parallel-reqs plugin-2) 32))
-    (is (= (plugin/max-parallel-reqs plugin-3) 1023))
-    (is (= (plugin/max-parallel-reqs plugin-4) 512))))
+    (is (= (#'plugin/max-parallel-reqs plugin-0) 512))
+    (is (= (#'plugin/max-parallel-reqs plugin-1) 1))
+    (is (= (#'plugin/max-parallel-reqs plugin-2) 32))
+    (is (= (#'plugin/max-parallel-reqs plugin-3) 1023))
+    (is (= (#'plugin/max-parallel-reqs plugin-4) 512))))
 
 (deftest params->map-test
   ;; params is {}

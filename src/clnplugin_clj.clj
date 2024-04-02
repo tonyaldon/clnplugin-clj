@@ -5,7 +5,7 @@
   (:require [clojure.data.json :as json])
   (:require [clojure.core.async :refer [go >!! <!! chan thread]]))
 
-(defn gm-option
+(defn- gm-option
   "Check option and return it in a format understable by lightningd.
 
   For instance, given [:foo {:type \"int\" :default -1}] this function
@@ -81,14 +81,14 @@
         deprecated (and deprecated {:deprecated true})]
     (merge name type description default multi dynamic deprecated)))
 
-(defn gm-options
+(defn- gm-options
   "Return the vector of plugin options meant to be used in the getmanifest response.
 
   See `gm-option` and `gm-resp`."
   [options]
   (mapv gm-option (seq options)))
 
-(defn gm-rpcmethods
+(defn- gm-rpcmethods
   "Return the vector of RPC methods meant to be used in the getmanifest response.
 
   RPCMETHODS is a list ([kw-1 map-1] [kw-2 map-2] ...) obtained from
@@ -240,7 +240,7 @@
                    (when (:deprecated method) {:deprecated true})))]
     (mapv f (seq rpcmethods))))
 
-(defn gm-notifications
+(defn- gm-notifications
   "Return the vector of notifications meant to be used in the getmanifest response.
 
   NOTIFICATIONS is a vector of the notification topics we want to
@@ -275,7 +275,7 @@
                 true {:method topic}))]
       (mapv f notifications))))
 
-(defn gm-subscriptions
+(defn- gm-subscriptions
   "Return the vector of subscriptions meant to be used in the getmanifest response."
   [subscriptions]
   (let [f (fn [[kw-name subscription]]
@@ -296,7 +296,7 @@
         ;; notification topics.
         (if (some #(= % "*") subs) ["*"] subs)))))
 
-(defn gm-hooks
+(defn- gm-hooks
   "Return the vector of hooks meant to be used in the getmanifest response."
   [hooks]
   (when hooks
@@ -313,7 +313,7 @@
                      (when after {:after after})))]
       (mapv f (seq hooks)))))
 
-(defn gm-resp
+(defn- gm-resp
   "Return the response to the getmanifest REQ.
 
   PLUGIN can contain any key you want, but only the following
@@ -354,14 +354,14 @@
             (when-let [custommessages (:custommessages p)]
               {:custommessages custommessages}))}))
 
-(defn set-defaults!
+(defn- set-defaults!
   "Set default values for :dynamic, :options and :rpcmethods keys if omitted.
 
   In particular, plugins are dynamic by default if not otherwise specified."
   [plugin]
   (swap! plugin #(merge {:options {} :rpcmethods {} :dynamic true} %)))
 
-(defn add-request!
+(defn- add-request!
   "Store :params of REQ in PLUGIN.
 
   We use it to add :getmanifest and :init keys to the plugin with
@@ -383,7 +383,7 @@
     (print-method e sw)
     (str sw)))
 
-(defn convert-opt-value
+(defn- convert-opt-value
   "Return VALUE converted into TYPE."
   [value type]
   ;; at the init round, value have the correct type specified
@@ -407,7 +407,7 @@
                         true
                         (Boolean/parseBoolean value)))))
 
-(defn set-option!
+(defn- set-option!
   "Set KW-OPT's :value to VALUE in PLUGIN's :options.
 
   :check-opt function:
@@ -473,7 +473,7 @@
          (throw (ex-info msg {:error {:code -32602 :message msg}})))))))
 
 
-(defn set-options-at-init!
+(defn- set-options-at-init!
   "Set OPTIONS in PLUGIN.
 
   This is meant to be used by `process-init!` when we process lightningd
@@ -485,7 +485,7 @@
     (doseq [opt (seq options)]
       (set-option! opt plugin :at-init))))
 
-(defn setconfig!
+(defn- setconfig!
   "Set in PLUGIN the dynamic option specified in PARAMS to its new value.
 
   This function is meant to be used to process \"setconfig\"
@@ -526,7 +526,7 @@
     (set-option! [kw-opt value] plugin)
     {}))
 
-(defn process-init!
+(defn- process-init!
   "Process \"init\" REQ request received from lightningd.
 
   `process-init!` do the following in order:
@@ -592,7 +592,7 @@
                                  init-fn (class init-fn))})]
     {:jsonrpc "2.0" :id (:id req) :result ok-or-disable}))
 
-(defn notif
+(defn- notif
   "Return a METHOD notification with PARAMS to be send to lightningd.
 
   METHOD is a string.
@@ -600,7 +600,7 @@
   [method params]
   {:jsonrpc "2.0" :method method :params params})
 
-(defn json-default-write
+(defn- json-default-write
   "Write OBJ stringified to OUT.
 
   This function is meant to be used as value of the option
@@ -636,7 +636,7 @@
       (. out (append "\n\n")) ;; required by lightningd
       (. out (flush)))))
 
-(defn write-resp
+(defn- write-resp
   "Write RESP to OUT.
 
   If RESP contains non JSON writable objects, RESP is transformed into
@@ -664,7 +664,7 @@
     (. out (append (str r "\n\n")))
     (. out (flush))))
 
-(defn write-notif
+(defn- write-notif
   "Write NOTIF to OUT.
 
   If NOTIF contains non JSON writable objects, do not write NOTIF to OUT.
@@ -686,7 +686,7 @@
       (. out (append (str r "\n\n")))
       (. out (flush)))))
 
-(defn write
+(defn- write
   "Write to OUT the responses and notifications in RESPS collection.
 
   Elements in RESPS are [req resp] vectors:
@@ -953,7 +953,7 @@
                   {:stage {:num stage :total total-stages}}))]
      (notify "progress" params plugin))))
 
-(defn process
+(defn- process
   "Return [log-msgs resp] vector where resp is the response to REQ.
 
   Specifically, we look for a method defined for REQ's :method
@@ -999,7 +999,7 @@
         [[msg (exception e)]
          (when req-id (merge jsonrpc {:error {:code -32603 :message msg :exception (exception e)}}))]))))
 
-(defn read
+(defn- read
   "Read one lightningd JSON-RPC request from IN.
 
   JSON fields are converted into keywords: \"id\" -> :id.
@@ -1056,7 +1056,7 @@
         true (let [next-line (read-line)]
                (recur (str req-acc line) next-line))))))
 
-(defn max-parallel-reqs
+(defn- max-parallel-reqs
   "Return the maximun number of requests allowed to be processed in parallel.
 
   Look at PLUGIN's :max-parallel-reqs key which must be < 1024.
