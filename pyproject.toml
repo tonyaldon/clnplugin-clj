@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "clnplugin-clj"
-version = "23.11"
+version = "24.02"
 description = "Core Lightning plugin library for Clojure."
 authors = ["Tony Aldon <tony@tonyaldon.com>"]
 readme = "README.org"
