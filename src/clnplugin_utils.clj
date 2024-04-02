@@ -93,16 +93,4 @@
   [keys params]
   (or (and (map? params)
            (select-keys params keys))
-      (zipmap keys params))
-  )
-
-
-
-
-"(plugin/params->map [:foo :bar :baz]
-                    {:foo \"foo-value\" :bar \"bar-value\"})
-{:foo \"foo-value\" :bar \"bar-value\"}
-
-(plugin/params->map [:foo :bar :baz]
-                    [\"foo-value\" \"bar-value\"])
-{:foo \"foo-value\" :bar \"bar-value\"}"
+      (zipmap keys params)))
