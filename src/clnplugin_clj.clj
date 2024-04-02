@@ -601,6 +601,7 @@
 (defn notif
   "Return a METHOD notification with PARAMS to be send to lightningd.
 
+  METHOD is a string.
   As this is a notification, the returned map contains no :id key."
   [method params]
   {:jsonrpc "2.0" :method method :params params})
