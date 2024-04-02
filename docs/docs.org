@@ -1,0 +1,117 @@
+* clnplugin-clj
+:PROPERTIES:
+:ONE: one-default-home
+:CUSTOM_ID: /
+:END:
+
+*clnplugin-clj* is a [[https://github.com/ElementsProject/lightning][Core Lightning]] (CLN) plugin library for Clojure
+Devs.
+
+Assuming you have [[https://github.com/clojure/clojure][Clojure]] and [[https://github.com/babashka/babashka][babashka]] (bb) installed on your machine,
+and you also have a CLN node running, you can get a *clnplugin-clj*
+plugin running just by issuing the following 2 commands (being in an
+empty directory):
+
+#+BEGIN_SRC tms
+$ curl -s -L https://clnplugin.tonyaldon.com/np | bb 1>/dev/null 2>&1
+$ lightning-cli plugin start $(pwd)/myplugin
+#+END_SRC
+
+Some JSON RPC methods have been added to ~lightningd~ and now you can
+for instance call ~my-foo~ method by running:
+
+#+BEGIN_SRC tms
+$ l1-cli my-foo
+{
+   "bar": "baz"
+}
+#+END_SRC
+
+In fact, ~myplugin~
+
+- defines 3 options ~my-opt~, ~my-opt-multi~ and ~my-opt-dynamic~,
+- registers 6 JSON RPC methods ~my-foo~, ~my-options~, ~my-info~, ~my-log~
+  ~my-json-rpc-error~ and ~my-notify~,
+- declares 1 custom notification topic ~my-topic~,
+- subscribes to the custom notification topic ~my-topic~ and to the
+  builtin topic notification topic ~invoice_creation~,
+- asks to be consulted for the ~peer_connected~ hook and
+- initializes the plugin with :init-fn function.
+
+All of this can be looked up in the file ~src/myplugin.clj~ (created by
+~np~ script) that we reproduce below (skipping the 281 lines of comments):
+
+
+#+BEGIN_SRC clojure
+(ns myplugin
+  (:require [clnplugin-clj :as plugin])
+  (:require [clnrpc-clj :as rpc])
+  (:gen-class))
+
+(def plugin
+  (atom {:options {:my-opt {:type "string"
+                            :description "some description"
+                            :default "my-opt-default"}
+                   :my-opt-multi {:type "string"
+                                  :multi true}
+                   :my-opt-dynamic {:type "int"
+                                    :dynamic true}}
+         :rpcmethods
+         {:my-foo {:fn (fn [params req plugin] {:bar "baz"})}
+          :my-options
+          {:fn (fn [params req plugin]
+                 {:my-opt (plugin/get-option plugin :my-opt)
+                  :my-opt-multi (plugin/get-option plugin :my-opt-multi)
+                  :my-opt-dynamic (plugin/get-option plugin :my-opt-dynamic)})}
+          :my-info
+          {:fn (fn [params req plugin]
+                 {:id (:id (rpc/getinfo @plugin))
+                  :offline (-> (rpc/call @plugin "listconfigs")
+                               :configs :offline)
+                  :config (get-in @plugin [:init :configuration])})}
+          :my-log
+          {:fn (fn [params req plugin]
+                 (let [{:keys [message level]}
+                       (plugin/params->map [:message :level] params)]
+                   (plugin/log (or message "default message")
+                               (or level "info")
+                               plugin)))}
+          :my-json-rpc-error
+          {:fn (fn [params req plugin]
+                 (let [{:keys [p-req p-opt]}
+                       (plugin/params->map [:p-req :p-opt] params)]
+                   (if (nil? p-req)
+                     (throw
+                      (ex-info "" {:error {:code "-100"
+                                           :message "'p-req' param is required"
+                                           :request req}}))
+                     {:p-req p-req :p-opt p-opt})))}
+          :my-notify
+          {:fn (fn [params req plugin]
+                 (let [p {:msg "some message" :data "some data"}]
+                   (plugin/notify "my-topic" p plugin)))}}
+         :notifications ["my-topic"]
+         :subscriptions
+         {:my-topic {:fn (fn [params req plugin]
+                           (plugin/log (format "%s" req) plugin))}
+          :invoice_creation {:fn (fn [params req plugin]
+                                   (plugin/log (format "%s" req) plugin))}}
+         :hooks
+         {:peer_connected
+          {:before ["my-plugin-foo"]
+           :after  ["my-plugin-bar" "my-plugin-baz"]
+           :fn (fn [params req plugin]
+                 (plugin/log (format "peer-id: %s" (get-in params [:peer :id]))
+                             plugin)
+                 {:result "continue"})}}
+         :init-fn
+         (fn [params req plugin]
+           (if (= (plugin/get-option plugin :my-opt) "disable")
+             (throw (ex-info "To start the plugin, don't set 'my-opt' to 'disable'." {}))
+             (plugin/log (format "%s" req) plugin)))}))
+
+(defn -main [& args]
+  (plugin/run plugin))
+#+END_SRC
+
+You can find the source code on github: [[https://github.com/tonyaldon/clnplugin-clj][tonyaldon/clnplugin-clj]].
