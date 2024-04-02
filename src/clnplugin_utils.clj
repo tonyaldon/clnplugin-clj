@@ -1,5 +1,20 @@
 (in-ns 'clnplugin-clj)
 
+(defn dev-set-rpcmethod
+  "..."
+  [plugin method fn]
+  (swap! plugin assoc-in [:rpcmethods method :fn] fn))
+
+(defn dev-set-subscription
+  "..."
+  [plugin topic fn]
+  (swap! plugin assoc-in [:subscriptions topic :fn] fn))
+
+(defn dev-set-hook
+  "..."
+  [plugin hook fn]
+  (swap! plugin assoc-in [:hooks hook :fn] fn))
+
 (defn params->map
   "Return PARAMS as a map binding PARAMS's elements to keys in KEYS.
 

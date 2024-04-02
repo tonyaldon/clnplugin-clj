@@ -297,7 +297,7 @@
         (if (some #(= % "*") subs) ["*"] subs)))))
 
 (defn gm-hooks
-  "..."
+  "Return the vector of hooks meant to be used in the getmanifest response."
   [hooks]
   (when hooks
     (let [f (fn [[kw-name {:keys [before after fn]}]]
@@ -961,8 +961,13 @@
 (defn process
   "Return [log-msgs resp] vector where resp is the response to REQ.
 
-  Specifically, we look for a method defined for REQ's :method in PLUGIN's
-  :rpcmethods map and we try to apply its corresponding :fn function with
+  Specifically, we look for a method defined for REQ's :method
+
+  - in PLUGIN's :rpcmethods map,
+  - in PLUGIN's :hooks map and
+  - in PLUGIN's :subscriptions map
+
+  and we try to apply its corresponding :fn function with
   (:params REQ), REQ and PLUGIN arguments:
 
   1) if no exception is thrown, :fn's result becomes the value of
