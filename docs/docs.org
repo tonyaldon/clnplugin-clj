@@ -38,7 +38,7 @@ In fact, ~myplugin~ plugin
 - subscribes to the custom notification topic ~my-topic~ and to the
   builtin notification topic ~invoice_creation~,
 - asks to be consulted for the ~peer_connected~ hook and
-- initializes the plugin with a :init-fn function.
+- initializes the plugin with a ~:init-fn~ function.
 
 All of this can be looked up in the file ~src/myplugin.clj~ (created by
 ~np~ script) that we reproduce below (skipping the 281 lines of comments):
@@ -187,14 +187,13 @@ Let's connect to localhost at port 5555 with ~nc~ (we can do this with
 any client or better with your editor integration):
 
 #+BEGIN_SRC tms
-(clnplugin-clj-py3.10) ◉ tony@tony:~/work/projects/clnplugin-clj/tools:[git»master]
-$ rlwrap nc localhost 5555
+$ nc localhost 5555
 user=>
 #+END_SRC
 
-Notice that we have ~user=>~ prompt which expect use to evaluate Clojure
+Notice that we have ~user=>~ prompt which expect us to provide Clojure
 code.  ~user~ is because we are in ~user~ namespace.  Our plugin is
-defined in ~myplugin~ namespace, so let switch to that namespace:
+defined in ~myplugin~ namespace, so let's switch to that namespace:
 
 #+BEGIN_SRC tms
 myplugin=> (ns myplugin)
