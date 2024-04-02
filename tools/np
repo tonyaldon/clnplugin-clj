@@ -360,7 +360,34 @@
          (fn [params req plugin]
            (if (= (plugin/get-option plugin :my-opt) \"disable\")
              (throw (ex-info \"To start the plugin, don't set 'my-opt' to 'disable'.\" {}))
-             (plugin/log (format \"%s\" req) plugin)))}))
+             (plugin/log (format \"%s\" req) plugin)))
+
+         ;; Other keys that we can add to the plugin atom:
+         ;;
+         ;;     - :dynamic
+         ;;     - :featurebits
+         ;;     - :custommessages
+         ;;
+         ;; 1) :dynamic is set to true by default.  We can set to false
+         ;;    if we don't want the plugin to be dynamic.
+         ;; 2) :featurebits expects a map with whose values (the featurebits)
+         ;;    are string representing hexadecimal number like this for
+         ;;    for instance:
+         ;;
+         ;;        {
+         ;;          :init \"0200000000000000000000000000000000000000000000000000\" ;; 1 << 201
+         ;;          :node \"0800000000000000000000000000000000000000000000000000\" ;; 1 << 203
+         ;;          :invoice \"2000000000000000000000000000000000000000000000000000\" ;; 1 << 205
+         ;;          ;; :channel \"...\"
+         ;;        }
+         ;;
+         ;; 3) :custommessages expects a vector of integers like this
+         ;;    for instance:
+         ;;
+         ;;        [11008, 11010]
+         ;;
+
+         }))
 
 (defn -main [& args]
   (plugin/run plugin))
