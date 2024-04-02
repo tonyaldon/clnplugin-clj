@@ -2,3 +2,15 @@ Core Lightning plugin library for Clojure Devs.
 
 See https://clnplugin.tonyaldon.com and the docstrings for more
 information.
+
+* Dependency
+
+Add the following dependency to your ~deps.edn~ file:
+
+** Tested with Core Lightning v23.11
+
+#+BEGIN_SRC clojure
+{:deps
+ {io.github.tonyaldon/clnplugin-clj
+  {:git/tag "v23.11" :git/sha "a340708"}}}
+#+END_SRC
