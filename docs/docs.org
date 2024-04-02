@@ -294,8 +294,47 @@ Now, let's close the connection, call ~my-foo~ command and observe that
 we've modified the plugin while it was running:
 
 #+BEGIN_SRC tms
-$ l1-cli my-foo
+$ lightning-cli my-foo
 "THIS IS MAGIC!"
 #+END_SRC
 
 That's it!
+
+Almost!
+
+What about distributing a plugin we wrote with ~clnplugin-clj~?
+
+We can compile it into an ~uberjar~ file.  In fact this is the purpose
+of the file ~build.clj~ that ~np~ script created:
+
+#+BEGIN_SRC tms
+$ tree
+.
+├── build.clj
+├── deps.edn
+├── myplugin
+├── np
+└── src
+    └── myplugin.clj
+#+END_SRC
+
+So to compile our plugin, we can run the following command
+
+#+BEGIN_SRC tms
+$ clj -T:build plugin
+#+END_SRC
+
+which produces the ~uberjar~ file ~target/myplugin.jar~ that we start with
+~java~ command in ~target/myplugin~ script.
+
+Specifically, after stopping ~myplugin~ like this
+
+#+BEGIN_SRC tms
+$ lightning-cli plugin stop $(pwd)/myplugin
+#+END_SRC
+
+we can restart it but this time using the ~uberjar~ file like this:
+
+#+BEGIN_SRC tms
+$ l1-cli plugin start $(pwd)/target/myplugin
+#+END_SRC
