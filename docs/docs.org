@@ -4,7 +4,7 @@
 :CUSTOM_ID: /
 :END:
 
-*clnplugin-clj* is the only [[https://github.com/ElementsProject/lightning][Core Lightning]] plugin library which
+[[https://github.com/tonyaldon/clnplugin-clj][clnplugin-clj]] is the only [[https://github.com/ElementsProject/lightning][Core Lightning]] plugin library which
 lets you attach a socket REPL to the plugin's process, connect to it
 and modify its implementation while it's running.
 
@@ -19,8 +19,8 @@ $ curl -s -L https://clnplugin.tonyaldon.com/np | bb 1>/dev/null 2>&1
 $ lightning-cli plugin start $(pwd)/myplugin
 #+END_SRC
 
-Some JSON RPC methods have been added to ~lightningd~ and now you can
-for instance call ~my-foo~ method by running:
+As a result, some JSON RPC methods have been added to ~lightningd~ and
+now you can for instance call ~my-foo~ method by running:
 
 #+BEGIN_SRC tms
 $ l1-cli my-foo
@@ -115,4 +115,25 @@ All of this can be looked up in the file ~src/myplugin.clj~ (created by
   (plugin/run plugin))
 #+END_SRC
 
-You can find the source code on github: [[https://github.com/tonyaldon/clnplugin-clj][tonyaldon/clnplugin-clj]].
+Maybe we want to modify our plugin.  We can for instance visit
+~src/myplugin.clj~ file and change :fn function of :my-foo map in
+:rpcmethods map to the following function that always returns the
+string ~"Nothing fancy so far"~:
+
+#+BEGIN_SRC clojure
+(fn [params req plugin] "Nothing fancy so far")
+#+END_SRC
+
+Now, let's stop and restart ~myplugin~
+
+#+BEGIN_SRC tms
+$ lightning-cli plugin stop $(pwd)/myplugin
+$ lightning-cli plugin start $(pwd)/myplugin
+#+END_SRC
+
+and call ~my-foo~ method:
+
+#+BEGIN_SRC tms
+$ l1-cli my-foo
+"Nothing fancy so far"
+#+END_SRC
