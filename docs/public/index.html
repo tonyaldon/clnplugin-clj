@@ -1,0 +1,130 @@
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1" /><link rel="stylesheet" type="text/css" href="/one.css" /><title>clnplugin-clj</title></head><body><div class="header">clnplugin-clj</div><div class="content"><div id="home"><div><p><b>clnplugin-clj</b> is the only <a href="https://github.com/ElementsProject/lightning">Core Lightning</a> plugin library which
+lets you attach a socket REPL to the plugin&apos;s process, connect to it
+and modify its implementation while it&apos;s running.
+</p>
+
+<p>All this is possible thanks to Clojure and the JVM.
+</p>
+
+<p>Assuming you have <a href="https://github.com/clojure/clojure">Clojure</a> and <a href="https://github.com/babashka/babashka">babashka</a> (bb) installed on your machine,
+and you also have a CLN node running, you can get a <b>clnplugin-clj</b>
+plugin running just by issuing the following 2 commands (being in an
+empty directory):
+</p>
+
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">curl -s -L https://clnplugin.tonyaldon.com/np | bb 1&gt;/dev/null 2&gt;&amp;1</span>
+$ <span class="one-hl-tms-cmd-line">lightning-cli plugin start $(pwd)/myplugin</span></code></pre>
+
+<p>Some JSON RPC methods have been added to <code class="one-hl one-hl-inline">lightningd</code> and now you can
+for instance call <code class="one-hl one-hl-inline">my-foo</code> method by running:
+</p>
+
+<pre><code class="one-hl one-hl-block">$ <span class="one-hl-tms-cmd-line">l1-cli my-foo</span>
+{
+   "bar": "baz"
+}</code></pre>
+
+<p>In fact, <code class="one-hl one-hl-inline">myplugin</code>
+</p>
+
+<ul><li><p>defines 3 options <code class="one-hl one-hl-inline">my-opt</code>, <code class="one-hl one-hl-inline">my-opt-multi</code> and <code class="one-hl one-hl-inline">my-opt-dynamic</code>,
+</p>
+</li>
+<li><p>registers 6 JSON RPC methods <code class="one-hl one-hl-inline">my-foo</code>, <code class="one-hl one-hl-inline">my-options</code>, <code class="one-hl one-hl-inline">my-info</code>, <code class="one-hl one-hl-inline">my-log</code>
+<code class="one-hl one-hl-inline">my-json-rpc-error</code> and <code class="one-hl one-hl-inline">my-notify</code>,
+</p>
+</li>
+<li><p>declares 1 custom notification topic <code class="one-hl one-hl-inline">my-topic</code>,
+</p>
+</li>
+<li><p>subscribes to the custom notification topic <code class="one-hl one-hl-inline">my-topic</code> and to the
+builtin topic notification topic <code class="one-hl one-hl-inline">invoice_creation</code>,
+</p>
+</li>
+<li><p>asks to be consulted for the <code class="one-hl one-hl-inline">peer_connected</code> hook and
+</p>
+</li>
+<li><p>initializes the plugin with :init-fn function.
+</p>
+</li>
+</ul>
+
+<p>All of this can be looked up in the file <code class="one-hl one-hl-inline">src/myplugin.clj</code> (created by
+<code class="one-hl one-hl-inline">np</code> script) that we reproduce below (skipping the 281 lines of comments):
+</p>
+
+
+<pre><code class="one-hl one-hl-block">(<span class="one-hl-keyword">ns</span> <span class="one-hl-type">myplugin</span>
+  (<span class="one-hl-clojure-keyword">:require</span> [clnplugin-clj <span class="one-hl-clojure-keyword">:as</span> plugin])
+  (<span class="one-hl-clojure-keyword">:require</span> [clnrpc-clj <span class="one-hl-clojure-keyword">:as</span> rpc])
+  (<span class="one-hl-clojure-keyword">:gen-class</span>))
+
+(<span class="one-hl-keyword">def</span> <span class="one-hl-variable-name">plugin</span>
+  (atom {<span class="one-hl-clojure-keyword">:options</span> {<span class="one-hl-clojure-keyword">:my-opt</span> {<span class="one-hl-clojure-keyword">:type</span> <span class="one-hl-string">"string"</span>
+                            <span class="one-hl-clojure-keyword">:description</span> <span class="one-hl-string">"some description"</span>
+                            <span class="one-hl-clojure-keyword">:default</span> <span class="one-hl-string">"my-opt-default"</span>}
+                   <span class="one-hl-clojure-keyword">:my-opt-multi</span> {<span class="one-hl-clojure-keyword">:type</span> <span class="one-hl-string">"string"</span>
+                                  <span class="one-hl-clojure-keyword">:multi</span> <span class="one-hl-constant">true</span>}
+                   <span class="one-hl-clojure-keyword">:my-opt-dynamic</span> {<span class="one-hl-clojure-keyword">:type</span> <span class="one-hl-string">"int"</span>
+                                    <span class="one-hl-clojure-keyword">:dynamic</span> <span class="one-hl-constant">true</span>}}
+         <span class="one-hl-clojure-keyword">:rpcmethods</span>
+         {<span class="one-hl-clojure-keyword">:my-foo</span> {<span class="one-hl-clojure-keyword">:fn</span> (<span class="one-hl-keyword">fn</span> [params req plugin] {<span class="one-hl-clojure-keyword">:bar</span> <span class="one-hl-string">"baz"</span>})}
+          <span class="one-hl-clojure-keyword">:my-options</span>
+          {<span class="one-hl-clojure-keyword">:fn</span> (<span class="one-hl-keyword">fn</span> [params req plugin]
+                 {<span class="one-hl-clojure-keyword">:my-opt</span> (<span class="one-hl-type">plugin</span>/get-option plugin <span class="one-hl-clojure-keyword">:my-opt</span>)
+                  <span class="one-hl-clojure-keyword">:my-opt-multi</span> (<span class="one-hl-type">plugin</span>/get-option plugin <span class="one-hl-clojure-keyword">:my-opt-multi</span>)
+                  <span class="one-hl-clojure-keyword">:my-opt-dynamic</span> (<span class="one-hl-type">plugin</span>/get-option plugin <span class="one-hl-clojure-keyword">:my-opt-dynamic</span>)})}
+          <span class="one-hl-clojure-keyword">:my-info</span>
+          {<span class="one-hl-clojure-keyword">:fn</span> (<span class="one-hl-keyword">fn</span> [params req plugin]
+                 {<span class="one-hl-clojure-keyword">:id</span> (<span class="one-hl-clojure-keyword">:id</span> (<span class="one-hl-type">rpc</span>/getinfo @plugin))
+                  <span class="one-hl-clojure-keyword">:offline</span> (<span class="one-hl-keyword">-&gt;</span> (<span class="one-hl-type">rpc</span>/call @plugin <span class="one-hl-string">"listconfigs"</span>)
+                               <span class="one-hl-clojure-keyword">:configs</span> <span class="one-hl-clojure-keyword">:offline</span>)
+                  <span class="one-hl-clojure-keyword">:config</span> (get-in @plugin [<span class="one-hl-clojure-keyword">:init</span> <span class="one-hl-clojure-keyword">:configuration</span>])})}
+          <span class="one-hl-clojure-keyword">:my-log</span>
+          {<span class="one-hl-clojure-keyword">:fn</span> (<span class="one-hl-keyword">fn</span> [params req plugin]
+                 (<span class="one-hl-keyword">let</span> [{<span class="one-hl-clojure-keyword">:keys</span> [message level]}
+                       (<span class="one-hl-type">plugin</span>/params-&gt;map [<span class="one-hl-clojure-keyword">:message</span> <span class="one-hl-clojure-keyword">:level</span>] params)]
+                   (<span class="one-hl-type">plugin</span>/log (<span class="one-hl-keyword">or</span> message <span class="one-hl-string">"default message"</span>)
+                               (<span class="one-hl-keyword">or</span> level <span class="one-hl-string">"info"</span>)
+                               plugin)))}
+          <span class="one-hl-clojure-keyword">:my-json-rpc-error</span>
+          {<span class="one-hl-clojure-keyword">:fn</span> (<span class="one-hl-keyword">fn</span> [params req plugin]
+                 (<span class="one-hl-keyword">let</span> [{<span class="one-hl-clojure-keyword">:keys</span> [p-req p-opt]}
+                       (<span class="one-hl-type">plugin</span>/params-&gt;map [<span class="one-hl-clojure-keyword">:p-req</span> <span class="one-hl-clojure-keyword">:p-opt</span>] params)]
+                   (<span class="one-hl-keyword">if</span> (nil? p-req)
+                     (<span class="one-hl-keyword">throw</span>
+                      (ex-info <span class="one-hl-string">""</span> {<span class="one-hl-clojure-keyword">:error</span> {<span class="one-hl-clojure-keyword">:code</span> <span class="one-hl-string">"-100"</span>
+                                           <span class="one-hl-clojure-keyword">:message</span> <span class="one-hl-string">"'p-req' param is required"</span>
+                                           <span class="one-hl-clojure-keyword">:request</span> req}}))
+                     {<span class="one-hl-clojure-keyword">:p-req</span> p-req <span class="one-hl-clojure-keyword">:p-opt</span> p-opt})))}
+          <span class="one-hl-clojure-keyword">:my-notify</span>
+          {<span class="one-hl-clojure-keyword">:fn</span> (<span class="one-hl-keyword">fn</span> [params req plugin]
+                 (<span class="one-hl-keyword">let</span> [p {<span class="one-hl-clojure-keyword">:msg</span> <span class="one-hl-string">"some message"</span> <span class="one-hl-clojure-keyword">:data</span> <span class="one-hl-string">"some data"</span>}]
+                   (<span class="one-hl-type">plugin</span>/notify <span class="one-hl-string">"my-topic"</span> p plugin)))}}
+         <span class="one-hl-clojure-keyword">:notifications</span> [<span class="one-hl-string">"my-topic"</span>]
+         <span class="one-hl-clojure-keyword">:subscriptions</span>
+         {<span class="one-hl-clojure-keyword">:my-topic</span> {<span class="one-hl-clojure-keyword">:fn</span> (<span class="one-hl-keyword">fn</span> [params req plugin]
+                           (<span class="one-hl-type">plugin</span>/log (format <span class="one-hl-string">"%s"</span> req) plugin))}
+          <span class="one-hl-clojure-keyword">:invoice_creation</span> {<span class="one-hl-clojure-keyword">:fn</span> (<span class="one-hl-keyword">fn</span> [params req plugin]
+                                   (<span class="one-hl-type">plugin</span>/log (format <span class="one-hl-string">"%s"</span> req) plugin))}}
+         <span class="one-hl-clojure-keyword">:hooks</span>
+         {<span class="one-hl-clojure-keyword">:peer_connected</span>
+          {<span class="one-hl-clojure-keyword">:before</span> [<span class="one-hl-string">"my-plugin-foo"</span>]
+           <span class="one-hl-clojure-keyword">:after</span>  [<span class="one-hl-string">"my-plugin-bar"</span> <span class="one-hl-string">"my-plugin-baz"</span>]
+           <span class="one-hl-clojure-keyword">:fn</span> (<span class="one-hl-keyword">fn</span> [params req plugin]
+                 (<span class="one-hl-type">plugin</span>/log (format <span class="one-hl-string">"peer-id: %s"</span> (get-in params [<span class="one-hl-clojure-keyword">:peer</span> <span class="one-hl-clojure-keyword">:id</span>]))
+                             plugin)
+                 {<span class="one-hl-clojure-keyword">:result</span> <span class="one-hl-string">"continue"</span>})}}
+         <span class="one-hl-clojure-keyword">:init-fn</span>
+         (<span class="one-hl-keyword">fn</span> [params req plugin]
+           (<span class="one-hl-keyword">if</span> (= (<span class="one-hl-type">plugin</span>/get-option plugin <span class="one-hl-clojure-keyword">:my-opt</span>) <span class="one-hl-string">"disable"</span>)
+             (<span class="one-hl-keyword">throw</span> (ex-info <span class="one-hl-string">"To start the plugin, don't set 'my-opt' to 'disable'."</span> {}))
+             (<span class="one-hl-type">plugin</span>/log (format <span class="one-hl-string">"%s"</span> req) plugin)))}))
+
+(<span class="one-hl-keyword">defn</span> <span class="one-hl-function-name">-main</span> [&amp; args]
+  (<span class="one-hl-type">plugin</span>/run plugin))</code></pre>
+
+<p>You can find the source code on github: <a href="https://github.com/tonyaldon/clnplugin-clj">tonyaldon/clnplugin-clj</a>.
+</p>
+</div>
+</div></div></body></html>
