@@ -10,7 +10,7 @@
           :ns-default build}}}"
           (if (System/getenv "USE_LOCAL_CLNPLUGIN")
             "clnplugin-clj/clnplugin-clj {:local/root \"..\"}"
-            "io.github.tonyaldon/clnplugin-clj {:git/tag \"v24.02\" :git/sha \"0000000\"}")))
+            "io.github.tonyaldon/clnplugin-clj {:git/tag \"v24.02\" :git/sha \"1719539\"}")))
 
 (def build.clj
   "(ns build
