@@ -590,7 +590,7 @@
           (and (map? opts-disable) (contains? opts-disable :disable)) opts-disable
           (nil? init-fn) {}
           (fn? init-fn) (try
-                          (init-fn req plugin)
+                          (init-fn (:params req) req plugin)
                           {}
                           (catch clojure.lang.ExceptionInfo e {:disable (ex-message e)})
                           (catch Exception e {:disable (exception e)}))

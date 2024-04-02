@@ -730,7 +730,7 @@
                       :rpcmethods {}
                       :dynamic true
                       :getmanifest {:allow-deprecated-apis false}
-                      :init-fn (fn [req plugin]
+                      :init-fn (fn [params req plugin]
                                  (swap! plugin assoc-in [:set-by-init-fn] "init-fn"))})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {:foo "foo-value"
@@ -780,7 +780,7 @@
                           (throw (ex-info "Wrong option 'foo'" {})))}}
                       :rpcmethods {}
                       :dynamic true
-                      :init-fn (fn [req plugin] (/ 1 0))
+                      :init-fn (fn [params req plugin] (/ 1 0))
                       :getmanifest {:allow-deprecated-apis false}})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {:foo "foo-value"}
@@ -839,7 +839,7 @@
                       :rpcmethods {}
                       :dynamic true
                       :getmanifest {:allow-deprecated-apis false}
-                      :init-fn (fn [req plugin] (/ 1 0))})
+                      :init-fn (fn [params req plugin] (/ 1 0))})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {}
                       :configuration {:lightning-dir "/tmp/l1-regtest/regtest"
@@ -853,7 +853,7 @@
                       :rpcmethods {}
                       :dynamic true
                       :getmanifest {:allow-deprecated-apis false}
-                      :init-fn (fn [req plugin]
+                      :init-fn (fn [params req plugin]
                                  (throw (ex-info "disabled by user" {})))})
         req {:jsonrpc "2.0" :id 0 :method "init"
              :params {:options {}

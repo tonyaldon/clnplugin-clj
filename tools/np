@@ -357,7 +357,7 @@
          ;;
          ;;     2024-04-01T16:13:03.935Z INFO    plugin-myplugin: {:jsonrpc \\\"2.0\\\", :id \\\"cln:init#39\\\", :method \\\"init\\\", :params {:options {:my-opt \\\"my-opt-default\\\"}, :configuration {:lightning-dir \\\"/tmp/l1-regtest/regtest\\\", :rpc-file \\\"lightning-rpc\\\", :startup false, :network \\\"...\\\", :feature_set {:init \\\"...\\\", :node \\\"...\\\", :channel \\\"\\\", :invoice \\\"...\\\"}}}}
          :init-fn
-         (fn [req plugin]
+         (fn [params req plugin]
            (if (= (plugin/get-option plugin :my-opt) \"disable\")
              (throw (ex-info \"To start the plugin, don't set 'my-opt' to 'disable'.\" {}))
              (plugin/log (format \"%s\" req) plugin)))}))
