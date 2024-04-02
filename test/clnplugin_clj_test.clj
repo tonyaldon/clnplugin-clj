@@ -330,7 +330,7 @@
           :result {:options []
                    :rpcmethods []
                    :dynamic false}}))
-  ;; options, rpcmethods, subscriptions, notifications and hooks not empty
+  ;; options, rpcmethods, subscriptions, notifications, hooks and featurebits not empty
   (is (= (let [plugin
                (atom {:options {:foo-1 nil
                                 :foo-2 {:type "string"
@@ -361,7 +361,13 @@
                                       :after ["baz-3"]
                                       :fn (fn [params req plugin])}}
                       :notifications ["topic-1" "topic-2" "topic-3"]
-                      :dynamic true})
+                      :featurebits
+                      {
+                       :init "0200000000000000000000000000000000000000000000000000" ;; 1 << 201
+                       :node "0800000000000000000000000000000000000000000000000000" ;; 1 << 203
+                       :invoice "2000000000000000000000000000000000000000000000000000" ;; 1 << 205
+                       }
+                      :dynamic false})
                req {:id 16}]
            (plugin/gm-resp req plugin))
          {:jsonrpc "2.0"
@@ -390,7 +396,13 @@
                            {:name "foo-2" :after ["bar-2" "baz-2"]}
                            {:name "foo-3" :before ["bar-3"] :after ["baz-3"]}]
                    :notifications [{:method "topic-1"} {:method "topic-2"} {:method "topic-3"}]
-                   :dynamic true}}))
+                   :featurebits
+                   {
+                    :init "0200000000000000000000000000000000000000000000000000" ;; 1 << 201
+                    :node "0800000000000000000000000000000000000000000000000000" ;; 1 << 203
+                    :invoice "2000000000000000000000000000000000000000000000000000" ;; 1 << 205
+                    }
+                   :dynamic false}}))
   ;; error because :fn is not a function for foo rpcmethod
   (is (thrown-with-msg?
        Throwable

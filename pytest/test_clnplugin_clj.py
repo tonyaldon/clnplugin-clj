@@ -509,3 +509,12 @@ def test_tools_np(node_factory):
 
     # clean tools directory
     os.popen("cd ../tools && rm -r src build.clj deps.edn myplugin target").read()
+
+
+def test_plugin_feature_announce(node_factory):
+    plugin = os.path.join(os.getcwd(), "plugins/featurebits")
+    l1 = node_factory.get_node(options={"plugin": plugin})
+    l1_features = l1.info["our_features"]
+    assert l1_features["init"].startswith("020000000000")
+    assert l1_features["node"].startswith("080000000000")
+    assert l1_features["invoice"].startswith("200000000000")

@@ -348,7 +348,9 @@
             (when-let [hooks (gm-hooks (:hooks p))]
               {:hooks hooks})
             (when-let [notifications (gm-notifications (:notifications p))]
-              {:notifications notifications}))}))
+              {:notifications notifications})
+            (when-let [featurebits (:featurebits p)]
+              {:featurebits featurebits}))}))
 
 (defn set-defaults!
   "Set default values for :dynamic, :options and :rpcmethods keys if omitted.
