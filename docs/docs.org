@@ -23,7 +23,7 @@ As a result, some JSON RPC methods have been added to ~lightningd~ and
 now you can for instance call ~my-foo~ method by running:
 
 #+BEGIN_SRC tms
-$ l1-cli my-foo
+$ lightning-cli my-foo
 {
    "bar": "baz"
 }
@@ -116,8 +116,8 @@ All of this can be looked up in the file ~src/myplugin.clj~ (created by
 #+END_SRC
 
 Maybe we want to modify our plugin.  We can for instance visit
-~src/myplugin.clj~ file and change :fn function of :my-foo map in
-:rpcmethods map to the following function that always returns the
+~src/myplugin.clj~ file and change ~:fn~ function of ~:my-foo~ map in
+~:rpcmethods~ map to the following function that always returns the
 string ~"Nothing fancy so far"~:
 
 #+BEGIN_SRC clojure
@@ -134,6 +134,169 @@ $ lightning-cli plugin start $(pwd)/myplugin
 and call ~my-foo~ method:
 
 #+BEGIN_SRC tms
-$ l1-cli my-foo
+$ lightning-cli my-foo
 "Nothing fancy so far"
 #+END_SRC
+
+If you've read this far, maybe it's because you want to see a bit of
+magic!
+
+So let's go.  Let's see how we can modify ~myplugin~ while it's running.
+
+To do this, we modify ~myplugin~ bash script and instead of using the
+command line
+
+#+BEGIN_SRC bash
+clojure -M --main myplugin
+#+END_SRC
+
+to run our plugin, we uses the following which attach a socket REPL
+server to our plugin's process:
+
+#+BEGIN_SRC bash
+clojure -J-Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -M --main myplugin
+#+END_SRC
+
+Specifically, ~myplugin~ bash script is now this:
+
+#+BEGIN_SRC bash
+#!/usr/bin/env bash
+
+cd ${0%/*}
+# clojure -M --main myplugin
+clojure -J-Dclojure.server.repl="{:port 5555 :accept clojure.core.server/repl}" -M --main myplugin
+#+END_SRC
+
+It's time to restart ~myplugin~ plugin:
+
+#+BEGIN_SRC tms
+$ lightning-cli plugin stop $(pwd)/myplugin
+$ lightning-cli plugin start $(pwd)/myplugin
+#+END_SRC
+
+We can check that nothing change so far and we still have this:
+
+#+BEGIN_SRC tms
+$ lightning-cli my-foo
+"Nothing fancy so far"
+#+END_SRC
+
+Now we enter in the magic part!
+
+Let's connect to localhost at port 5555 with ~nc~ (we can do this with
+any client or better with your editor integration):
+
+#+BEGIN_SRC tms
+(clnplugin-clj-py3.10) ◉ tony@tony:~/work/projects/clnplugin-clj/tools:[git»master]
+$ rlwrap nc localhost 5555
+user=>
+#+END_SRC
+
+Notice that we have ~user=>~ prompt which expect use to evaluate Clojure
+code.  ~user~ is because we are in ~user~ namespace.  Our plugin is
+defined in ~myplugin~ namespace, so let switch to that namespace:
+
+#+BEGIN_SRC tms
+myplugin=> (ns myplugin)
+nil
+#+END_SRC
+
+Now, let's get the current value of the option ~my-opt~ that we defined:
+
+#+BEGIN_SRC tms
+myplugin=> (plugin/get-option plugin :my-opt)
+"my-opt-default"
+#+END_SRC
+
+Why don't we look at the state of ~plugin~ atom?
+
+#+BEGIN_SRC tms
+myplugin=> (clojure.pprint/pprint @plugin)
+{:init
+ {:options {:my-opt "my-opt-default"},
+  :configuration
+  {:lightning-dir "/tmp/l1-regtest/regtest",
+   :rpc-file "lightning-rpc",
+   :startup false,
+   :network "regtest",
+   :feature_set
+   {:init "080000000000000000000000000008a0882a0a69a2",
+    :node "080000000000000000000000000088a0882a0a69a2",
+    :channel "",
+    :invoice "02000022024100"}}},
+ :hooks
+ {:peer_connected
+  {:before ["my-plugin-foo"],
+   :after ["my-plugin-bar" "my-plugin-baz"],
+   :fn
+   #object[myplugin$fn__11031 0x5d9c7cf0 "myplugin$fn__11031@5d9c7cf0"]}},
+ :getmanifest {:allow-deprecated-apis false},
+ :subscriptions
+ {:my-topic
+  {:fn
+   #object[myplugin$fn__11027 0x1ca9f04b "myplugin$fn__11027@1ca9f04b"]},
+  :invoice_creation
+  {:fn
+   #object[myplugin$fn__11029 0x58094be8 "myplugin$fn__11029@58094be8"]}},
+ :notifications ["my-topic"],
+ :dynamic true,
+ :init-fn
+ #object[myplugin$fn__11033 0x1fe0a1ee "myplugin$fn__11033@1fe0a1ee"],
+ :_resps #<Agent@21a5351e: nil>,
+ :rpcmethods
+ {:my-foo
+  {:fn
+   #object[myplugin$fn__11011 0x725da2c9 "myplugin$fn__11011@725da2c9"]},
+  :my-options
+  {:fn
+   #object[myplugin$fn__11013 0x6019f161 "myplugin$fn__11013@6019f161"]},
+  :my-info
+  {:fn
+   #object[myplugin$fn__11015 0x7a6cc35d "myplugin$fn__11015@7a6cc35d"]},
+  :my-log
+  {:fn
+   #object[myplugin$fn__11017 0x72e914cb "myplugin$fn__11017@72e914cb"]},
+  :my-json-rpc-error
+  {:fn
+   #object[myplugin$fn__11022 0x6d3dbbb5 "myplugin$fn__11022@6d3dbbb5"]},
+  :my-notify
+  {:fn
+   #object[myplugin$fn__11025 0x4200cd8a "myplugin$fn__11025@4200cd8a"]},
+  :setconfig
+  {:fn
+   #object[clnplugin_clj$setconfig_BANG_ 0x5eea98bc "clnplugin_clj$setconfig_BANG_@5eea98bc"]}},
+ :options
+ {:my-opt
+  {:type "string",
+   :description "some description",
+   :default "my-opt-default",
+   :value "my-opt-default"},
+  :my-opt-multi {:type "string", :multi true},
+  :my-opt-dynamic {:type "int", :dynamic true}},
+ :socket-file "/tmp/l1-regtest/regtest/lightning-rpc",
+ :_out
+ #object[java.io.OutputStreamWriter 0x649f80e6 "java.io.OutputStreamWriter@649f80e6"]}
+nil
+#+END_SRC
+
+Interesting but how about modifying the plugin?
+
+OK, let's do that.
+
+Let's redefine ~my-foo~ method such that it returns the string ~"THIS IS
+MAGIC!"~:
+
+#+BEGIN_SRC tms
+myplugin=> (plugin/dev-set-rpcmethod plugin :my-foo (fn [params req plugin] "THIS IS MAGIC!")))
+{...}
+#+END_SRC
+
+Now, let's close the connection, call ~my-foo~ command and observe that
+we've modified the plugin while it was running:
+
+#+BEGIN_SRC tms
+$ l1-cli my-foo
+"THIS IS MAGIC!"
+#+END_SRC
+
+That's it!
