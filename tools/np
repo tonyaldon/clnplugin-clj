@@ -370,7 +370,7 @@
          ;;
          ;; 1) :dynamic is set to true by default.  We can set to false
          ;;    if we don't want the plugin to be dynamic.
-         ;; 2) :featurebits expects a map with whose values (the featurebits)
+         ;; 2) :featurebits expects a map whose values (the featurebits)
          ;;    are string representing hexadecimal number like this for
          ;;    for instance:
          ;;
@@ -380,6 +380,9 @@
          ;;          :invoice \"2000000000000000000000000000000000000000000000000000\" ;; 1 << 205
          ;;          ;; :channel \"...\"
          ;;        }
+         ;;
+         ;;    Note that custom featurebits can only be set by non-dynamic plugins.  So,
+         ;;    if you set :featurebits you must set :dynamic to false.
          ;;
          ;; 3) :custommessages expects a vector of integers like this
          ;;    for instance:
